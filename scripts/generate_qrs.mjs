@@ -12,15 +12,20 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
 // Khởi tạo Supabase Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
 
 if (!supabaseUrl || !supabaseKey) {
   console.error("Lỗi: Không tìm thấy biến môi trường Supabase trong .env.local!");
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+console.log(`Kết nối tới: ${supabaseUrl.substring(0, 12)}... (Check URL)`);
+
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false },
+  global: { fetch: fetch.bind(globalThis) }
+});
 
 // Tham số đầu vào default
 let count = 1;
@@ -117,35 +122,55 @@ async function bulkGenerate() {
     fs.mkdirSync(outputDir);
   }
 
-  // Tiền xử lý: Rút toàn bộ ID trong CSDL để đảm bảo bọc lót chống trùng lặp tuyệt đối
-  console.log("Đang quét đối chiếu danh bạ DB để tự động chống trùng lặp mã...");
-  const { data: existingMoments } = await supabase.from('moments').select('short_id');
-  const usedIds = new Set(existingMoments?.map(m => m.short_id) || []);
+  // Helper để retry các cuộc gọi API
+  async function supabaseWithRetry(fn, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const result = await fn();
+        if (!result.error) return result;
+        if (i === retries - 1) return result;
+      } catch (err) {
+        if (i === retries - 1) throw err;
+      }
+      await new Promise(r => setTimeout(r, 1000)); // Đợi 1s trước khi thử lại
+    }
+  }
 
+  // Tiền xử lý: Rút toàn bộ ID trong CSDL
+  console.log("Đang quét đối chiếu danh bạ DB để tự động chống trùng lặp mã...");
+  const { data: existingMoments, error: fetchError } = await supabaseWithRetry(() => 
+    supabase.from('moments').select('short_id')
+  );
+
+  if (fetchError) {
+    console.error("❌ Lỗi mạng khi kết nối database:", fetchError.message || fetchError);
+    return;
+  }
+
+  const usedIds = new Set(existingMoments?.map(m => m.short_id) || []);
   let successCount = 0;
 
   for (let i = 0; i < count; i++) {
     let shortId;
-    // Thuật toán gác cổng: Sinh mã mới liên tục cho đến khi tìm được mã độc nhất chưa ai dùng
     do {
       shortId = crypto.randomUUID().replace(/-/g, '').substring(0, 8);
     } while (usedIds.has(shortId));
     
-    // Ghi nhớ mã vừa sinh để chống trùng trong chính đợt chạy này
     usedIds.add(shortId);
-
     const link = `${urlPrefix}${shortId}`;
 
     try {
       // 1. Lưu vào Database (chưa kích hoạt)
-      const { error } = await supabase.from('moments').insert({
-        short_id: shortId,
-        is_activated: false,
-        title: "Kỉ niệm bí ẩn", // Tên ngẫu nhiên cho có
-      });
+      const { error } = await supabaseWithRetry(() => 
+        supabase.from('moments').insert({
+          short_id: shortId,
+          is_activated: false,
+          title: "Kỉ niệm bí ẩn",
+        })
+      );
 
       if (error) {
-        console.error(`[Lỗi] Không thể nạp ${shortId} lên CSDL:`, error.message);
+        console.error(`[Lỗi] Không thể nạp ${shortId}:`, error.message, error.hint || "");
         continue;
       }
 
@@ -157,10 +182,10 @@ async function bulkGenerate() {
       const filePath = path.join(outputDir, `bearqr_${shortId}.svg`);
       
       fs.writeFileSync(filePath, svg);
-      console.log(`✅ [${i+1}/${count}] Đã sinh QR: ${filePath}`);
+      console.log(`✅ [${i+1}/${count}] Đã sinh QR: bearqr_${shortId}.svg`);
       successCount++;
     } catch (err) {
-      console.error(`[Lỗi vòng lặp ${i+1}] ${err.message}`);
+      console.error(`[Lỗi vòng lặp ${i+1}] ${err.name}: ${err.message}`);
     }
   }
 

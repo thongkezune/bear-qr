@@ -19,6 +19,35 @@ interface MomentPlayerProps {
 }
 
 export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
+  // Kiểm tra cấu hình hệ thống
+  if (!supabase) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white p-8 text-center font-be-vietnam-pro">
+        <div className="w-20 h-20 rounded-full bg-rose-500/10 flex items-center justify-center mb-8">
+          <AlertCircle className="w-10 h-10 text-rose-500" />
+        </div>
+        <h2 className="text-2xl font-bold mb-4">Chưa hoàn tất thiết lập hệ thống</h2>
+        <p className="text-zinc-400 max-w-md mb-8 leading-relaxed">
+          Trang web đã được đưa lên Internet thành công, nhưng bạn chưa nạp các mã khóa bí mật (API Keys) từ Supabase vào Vercel. 
+        </p>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-left w-full max-w-sm space-y-3 mb-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Danh sách biến còn thiếu:</p>
+          <ul className="text-sm space-y-2 font-mono text-rose-400">
+            <li>• NEXT_PUBLIC_SUPABASE_URL</li>
+            <li>• NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
+            <li>• SUPABASE_SERVICE_ROLE_KEY</li>
+          </ul>
+        </div>
+        <button 
+          onClick={() => window.open('https://vercel.com', '_blank')}
+          className="px-8 py-4 bg-white text-black rounded-2xl font-bold hover:scale-105 transition-transform"
+        >
+          Cấu hình ngay trên Vercel
+        </button>
+      </div>
+    );
+  }
+
   const [viewState, setViewState] = useState<ViewState>("loading");
   const [isPlaying, setIsPlaying] = useState(false);
   const [isWallExpanded, setIsWallExpanded] = useState(false);
