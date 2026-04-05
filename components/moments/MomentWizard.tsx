@@ -120,7 +120,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         if (!resMedia.ok) throw new Error('Không thể lưu danh sách media.');
       }
       
-      setStep(6);
+      setStep(5);
     } catch (err: any) {
       console.error("Error activating moment:", err);
       alert("Có lỗi xảy ra: " + (err.message || "Vui lòng thử lại."));
@@ -276,8 +276,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         </AnimatePresence>
       </main>
 
-      {/* Bottom Actions - Hidden on Step 2 (Home) and Step 6 (Done) */}
-      {step !== 2 && step < 6 && (
+      {/* Bottom Actions - Hidden on Step 2 (Home) and Step 5 (Done) */}
+      {step !== 2 && step < 5 && (
         <footer className="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-8 pb-10 pt-6 bg-zinc-950/40 backdrop-blur-3xl rounded-t-[2.5rem] border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
           <button
             onClick={step === 1 ? onBack : prevStep}

@@ -196,36 +196,56 @@ export const SetupStep2 = ({ formData, updateFormData, momentId }: SetupStep2Pro
             ) : (
               <img src={item.url} alt="Memory" className="w-full h-full object-cover" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
-                <div className="flex gap-2">
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      setEditingIndex(idx);
-                      setTempSettings({ 
-                        mood: item.mood || 'chill', 
-                        volume: item.music_volume || 60 
-                      });
-                    }}
-                    className="p-2 rounded-xl bg-white/10 hover:bg-rose-500 text-white transition-all"
-                    title="Cài đặt nhạc nền"
-                  >
-                    <Music size={14} />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); removeMedia(idx); }}
-                    className="p-2 rounded-xl bg-white/10 hover:bg-red-500 text-white transition-all"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                   <div className="text-[8px] font-bold text-white/50 bg-white/5 px-2 py-1 rounded-md">
-                     {item.mood?.toUpperCase() || 'CHILL'} • {item.music_volume || 60}%
-                   </div>
-                   {item.type === 'video' ? <VideoIcon size={14} className="text-rose-400" /> : <ImageIcon size={14} className="text-rose-400" />}
+            {/* Overlay luôn hiển thị các nút chức năng */}
+            <div className="absolute inset-0 flex flex-col justify-between p-3">
+              {/* Nút chức năng ở góc trên */}
+              <div className="flex justify-end gap-2">
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setEditingIndex(idx);
+                    setTempSettings({ 
+                      mood: item.mood || 'chill', 
+                      volume: item.music_volume || 60 
+                    });
+                  }}
+                  className="p-2.5 rounded-xl bg-zinc-950/60 backdrop-blur-md border border-white/10 hover:bg-rose-500 hover:border-rose-400 text-white transition-all shadow-lg shadow-black/20"
+                  title="Cài đặt nhạc nền"
+                >
+                  <Music size={14} className={item.mood !== 'none' ? "text-rose-400" : "text-white"} />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); removeMedia(idx); }}
+                  className="p-2.5 rounded-xl bg-zinc-950/60 backdrop-blur-md border border-white/10 hover:bg-red-500 hover:border-red-400 text-white transition-all shadow-lg shadow-black/20"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Thông tin trạng thái ở góc dưới */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between items-end">
+                  <div className="flex flex-col gap-1">
+                    <div className="px-2 py-1 rounded-lg bg-zinc-950/60 backdrop-blur-md border border-white/10 inline-flex items-center gap-1.5 shadow-lg shadow-black/20">
+                      <div className={`w-1.5 h-1.5 rounded-full ${item.mood !== 'none' ? 'bg-rose-500 glow-rose' : 'bg-zinc-500'}`} />
+                      <span className="text-[9px] font-black tracking-widest text-white uppercase font-outfit">
+                        {item.mood === 'none' ? 'NO MUSIC' : item.mood}
+                      </span>
+                    </div>
+                    {item.mood !== 'none' && (
+                      <div className="px-2 py-0.5 rounded-lg bg-rose-500/10 backdrop-blur-sm border border-rose-500/20 inline-flex items-center gap-1">
+                        <Volume2 size={8} className="text-rose-400" />
+                        <span className="text-[8px] font-bold text-rose-300">{item.music_volume}%</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-zinc-950/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-rose-400 shadow-lg shadow-black/20">
+                    {item.type === 'video' ? <VideoIcon size={14} /> : <ImageIcon size={14} />}
+                  </div>
                 </div>
               </div>
+            </div>
+
             </div>
         ))}
 
