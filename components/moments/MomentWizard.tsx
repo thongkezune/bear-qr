@@ -348,6 +348,9 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         try {
           setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 5 }));
 
+          // Xử lý tên tệp: Xóa bỏ khoảng trắng và ký tự đặc biệt (Rất hay lỗi trên iPhone/Android)
+          const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+
           // A. Lấy Signed URL
           const res = await fetch('/api/manage', {
             method: 'POST',
@@ -356,7 +359,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
               momentId,
               adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
               action: 'GET_UPLOAD_SIGNED_URL',
-              payload: { fileName: `${Date.now()}_${file.name}` }
+              payload: { fileName: `${Date.now()}_${safeName}` }
             })
           });
 
@@ -367,6 +370,9 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           const xhr = new XMLHttpRequest();
           xhr.open('PUT', signedUrl);
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          
+          // QUAN TRỌNG: Bắt buộc khai báo định dạng (MIME Type) để Supabase không chặn các định dạng như .MOV của iPhone
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
           
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
