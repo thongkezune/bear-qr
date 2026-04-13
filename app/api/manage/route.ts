@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
             // Xử lý lưu tin nhắn Admin cho các file mới
             for (const m of mediaPayload) {
               if (m.admin_author && m.admin_content) {
-                const inserted = insertedItems?.find(ins => ins.storage_path === m.storage_path);
+                const inserted = insertedItems?.find((ins: any) => ins.storage_path === m.storage_path);
                 if (inserted) {
                   await supabaseAdmin.from('media_messages').insert([{
                     media_id: inserted.id,

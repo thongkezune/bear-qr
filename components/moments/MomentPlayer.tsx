@@ -151,7 +151,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
     
     if (shouldPlay && moodId !== 'none' && !isActuallyPaused) {
       const volume = (currentMedia?.music_volume ?? 60) / 100;
-      const moodData = AUDIO_MOODS.find(m => m.id === moodId) || AUDIO_MOODS[0];
+      const moodData = AUDIO_MOODS.find((m: any) => m.id === moodId) || AUDIO_MOODS[0];
       
       if (bgAudioRef.current.src !== moodData.audio) {
         bgAudioRef.current.src = moodData.audio;
@@ -466,7 +466,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
         {momentData?.mood && (
           <audio 
             ref={bgAudioRef}
-            src={AUDIO_MOODS.find(m => m.id === momentData.mood.toLowerCase())?.audio || AUDIO_MOODS[0].audio}
+            src={AUDIO_MOODS.find((m: any) => m.id === momentData.mood.toLowerCase())?.audio || AUDIO_MOODS[0].audio}
             loop 
           />
         )}

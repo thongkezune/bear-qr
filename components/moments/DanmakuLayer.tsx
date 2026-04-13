@@ -50,7 +50,7 @@ export const DanmakuLayer = ({ messages, isEnabled, resetKey }: DanmakuLayerProp
 
     const spawnMessage = () => {
       const now = Date.now();
-      const availableMessages = messages.filter(m => !displayedIdsRef.current.has(m.id));
+      const availableMessages = messages.filter((m: any) => !displayedIdsRef.current.has(m.id));
       if (availableMessages.length === 0) return;
 
       const nextMsg = availableMessages[0];

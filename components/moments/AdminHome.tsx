@@ -196,7 +196,7 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
                         e.stopPropagation(); 
                         if (confirm("Bạn có chắc chắn muốn xóa kỉ niệm này không?")) {
                           // Cập nhật giao diện cục bộ ngay lập tức
-                          setMemories(prev => prev.filter(m => m.storage_path !== item.storage_path));
+                          setMemories(prev => prev.filter((m: any) => m.storage_path !== item.storage_path));
                           // Gọi hàm xóa ở cấp độ quản lý (Wizard) để đồng bộ DB
                           onRemove?.(item.storage_path); 
                         }

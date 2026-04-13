@@ -388,7 +388,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         // BẢO VỆ DỮ LIỆU: Dùng functional update để không làm mất title/content đang nhập
         setFormData(prev => {
           const newMedia = [...prev.media];
-          const idx = newMedia.findIndex(m => m.storage_path === placeholderPath);
+          const idx = newMedia.findIndex((m: any) => m.storage_path === placeholderPath);
           if (idx !== -1) {
             newMedia[idx] = {
               ...newMedia[idx], 
@@ -443,8 +443,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     if (!momentId) return;
 
     // Tìm item cụ thể để lấy ID database nếu có
-    const itemToRemove = formData.media.find(m => m.storage_path === storagePath);
-    const newList = formData.media.filter(m => m.storage_path !== storagePath);
+    const itemToRemove = formData.media.find((m: any) => m.storage_path === storagePath);
+    const newList = formData.media.filter((m: any) => m.storage_path !== storagePath);
     
     // Cập nhật UI ngay lập tức
     updateFormData({ media: newList });
