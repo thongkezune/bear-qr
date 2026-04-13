@@ -1,193 +1,195 @@
 "use client";
-import { motion } from "framer-motion";
-import { useState, useRef, useEffect } from "react";
-import { Volume2 } from "lucide-react";
 
-export const AUDIO_MOODS = [
-  { id: "chill", name: "Chill", label: "Êm đềm", icon: "filter_drama", image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBQlYORel8laJ4WI6nkLzO2G5yrho4uggjuwKd0mrVxFg12tePYygCEPBqs8HSKuA7YWDSaxQQPAkccy8d23Ib2cXn95kPZbBaKhYDl2zFTs70nh9Oi97HiGuW-x9iffW-yU3pBvBQflSdxmA5uyg6KwLsnlUlvrbCA7dg3er3SDxof27rMdUYjk94hxsVIuvIgGyDDQjBrpUCCtkJRW9PCElegSiSIQKdaISbLszOIjek_g4TlKuUE61M2vag_ad-hjP2g_ieE5qr1", 
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3" },
-  { id: "romantic", name: "Lãng mạn", label: "Ngọt ngào", icon: "favorite", image: "https://lh3.googleusercontent.com/aida-public/AB6AXuD3rX7zxJgZDP4WMizR-6LFCs1Y2LtKvioEEGfSJTIDItJiCX1Q5jx-8EqUMMy-8cogw5ffea1ushZQWl03d7Ktqt_GYnzuEK3756M2FwaK6KsYd7zO1xK4w4PXZ8sUNwTlg4Oc_vUmofyEVtuj5nhMqgycxfro_MFh9SRdpqOqiYl5ZFTww7iETfpfDfn2rvooUAem9yLzmSgXnTaNMZIkOovlIMdqZ_iTg02amYM755x_6v09g99VfscJSIbkqBVaCOkb-VvGrpHc", 
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3" },
-  { id: "happy", name: "Vui vẻ", label: "Rạng rỡ", icon: "celebration", image: "https://lh3.googleusercontent.com/aida-public/AB6AXuA0aB50hMuIodjcpfmT1LWTQA4foyUUisjlJkV6fGJXBPMzaolAPhVZkVkxuxC3yUiRckaNmfYMf-mqqJiuWjs1ebi2pT-OQD6zYqAN8OKSIiIFU6dDymBNtjtEQQA7joijN9DnCPc9DMcfCnvy8TX0csIbQnAJ33sUbJ-bahF6-0IIC8Oc1pIjI3Aczr2N8bgbVbIo5pHfSL23xkD-CuWuf-LekajxAH-UMl9tVFLxITS6d3k1l8M9nVE3X1RfOIf0eu23JGnvrjdZ", 
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-  { id: "memory", name: "Ký ức", label: "Hoài niệm", icon: "history_edu", image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBBSjg_-4bKHinA0oAql4hKl0ONOg2vKUexffT8YCtezrPSqNUJj3oN8fQXeKSM6q7ZDxXcbQrPOxt15y8Fj21gy6eBT43qxhnQm5U-3N9eGCygob0I3dGVTy3XtWSnGGDhgrv0Qi0OLr7KvjN9tbKzpYE6QjEsNUzl88XYTiKaLwW7f1NhZDj1OEbK4i2S-S2as7__XYhElb9Z6cMJQrV3GP1-KiCiNGsbBwTD5_Dxr6MvLTd3PIn0ATvF26XtlMT0l1ApBJzqpvTZ", 
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
-];
+import { motion } from "framer-motion";
+import { Edit3, User, MessageCircle, Sparkles, Image as ImageIcon, Video as VideoIcon, History } from "lucide-react";
 
 interface SetupStep3Props {
   formData: any;
   updateFormData: (data: any) => void;
+  editingIndex: number;
+  uploadingFiles?: {[key: string]: number};
+  onBack?: () => void;
 }
 
-export const SetupStep3 = ({ formData, updateFormData }: SetupStep3Props) => {
-  const selectedMood = formData.mood.toLowerCase();
-  
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+export const SetupStep3 = ({ formData, updateFormData, editingIndex, uploadingFiles = {} }: SetupStep3Props) => {
+  const mediaItem = formData.media[editingIndex];
+  const progress = mediaItem?.storage_path ? uploadingFiles[mediaItem.storage_path] : null;
 
-  const activeMoodData = AUDIO_MOODS.find(m => m.id === selectedMood) || AUDIO_MOODS[0];
+  if (!mediaItem) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
+        <p>Không tìm thấy nội dung để chỉnh sửa.</p>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (audioRef.current && isPlaying) {
-      audioRef.current.volume = (formData.music_volume ?? 60) / 100;
-      audioRef.current.play().catch(err => console.log("Audio play error", err));
-    }
-  }, [selectedMood, isPlaying, formData.music_volume]);
-
-  const togglePreview = () => {
-    if (isPlaying) {
-      audioRef.current?.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current?.play().catch(err => console.log(err));
-      setIsPlaying(true);
-    }
+  const updateMediaField = (field: string, val: string) => {
+    const newMedia = [...formData.media];
+    newMedia[editingIndex] = { ...newMedia[editingIndex], [field]: val };
+    updateFormData({ media: newMedia });
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-8"
+      className="space-y-10 pb-20"
     >
-      <header className="mb-12 space-y-3 px-1">
-        <span className="text-primary font-bold uppercase tracking-[0.2em] text-[10px] opacity-80">
-          Giai điệu kỷ niệm
-        </span>
-        <h1 className="text-4xl font-extrabold tracking-tighter text-on-surface leading-tight">
-          Chọn cảm xúc
+      <header className="px-1 space-y-2">
+        <div className="flex items-center gap-2 text-rose-400 mb-2">
+          <Sparkles size={18} />
+          <span className="text-[10px] font-bold uppercase tracking-[.2em]">Biên tập nội dung kỉ niệm</span>
+        </div>
+        <h1 className="text-4xl font-extrabold tracking-tight text-white leading-tight font-outfit">
+          Lưu giữ khoảnh khắc
         </h1>
-        <p className="text-on-surface-variant/70 text-sm font-light leading-relaxed max-w-[280px]">
-          Âm nhạc là sợi dây kết nối ký ức. Hãy chọn một giai điệu để đánh thức những khoảnh khắc quý giá nhất.
-        </p>
+        <p className="text-zinc-500 text-sm font-light">Đặt tên và viết những lời nhắn nhủ chân thành nhất gắn liền với bức hình này.</p>
       </header>
 
-      <div className="flex overflow-x-auto no-scrollbar gap-6 py-8 px-2 -mx-2 items-center">
-        {AUDIO_MOODS.map((mood) => (
-          <div
-            key={mood.id}
-            onClick={() => {
-              updateFormData({ mood: mood.id });
-              setIsPlaying(true); // Tự động phát khi chọn
-            }}
-            className={`flex-none rounded-3xl flex flex-col items-center justify-end p-6 relative group transition-all duration-300 cursor-pointer ${
-              selectedMood === mood.id
-                ? "w-52 aspect-[3/4] scale-110 bg-gradient-to-b from-primary/20 to-secondary-container/40 ring-2 ring-primary/50 shadow-2xl"
-                : "w-48 aspect-[3/4] bg-surface-container-high hover:brightness-110"
-            }`}
-          >
-            <div className={`absolute inset-0 transition-all duration-500 rounded-3xl overflow-hidden ${
-              selectedMood === mood.id ? "opacity-60" : "opacity-20 grayscale group-hover:grayscale-0 group-hover:opacity-40"
-            }`}>
-              <img
-                alt={mood.name}
-                className="w-full h-full object-cover"
-                src={mood.image}
+      {/* Media Preview Section */}
+      <section className="relative aspect-video rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl bg-zinc-900 group">
+        {mediaItem.isPlaceholder ? (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950/40 backdrop-blur-2xl space-y-6">
+             <div className="relative w-24 h-24">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                   <circle className="text-white/5 stroke-current" strokeWidth="2" fill="transparent" r="45" cx="50" cy="50" />
+                   <motion.circle 
+                      className="text-rose-500 stroke-current" strokeWidth="3" strokeLinecap="round" fill="transparent" r="45" cx="50" cy="50"
+                      initial={{ strokeDasharray: "282.6", strokeDashoffset: 282.6 }}
+                      animate={{ strokeDashoffset: 282.6 - (282.6 * (progress || 0)) / 100 }}
+                      transition={{ duration: 0.5 }}
+                   />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                   <span className="text-xl font-black font-outfit">{progress || 0}%</span>
+                </div>
+             </div>
+             <div className="text-center space-y-1">
+                <p className="text-white font-bold text-xs uppercase tracking-[0.2em] animate-pulse">Đang truyền tải dữ liệu</p>
+                <p className="text-zinc-500 text-[9px]">Vui lòng chờ trong giây lát...</p>
+             </div>
+          </div>
+        ) : (
+          <>
+            {mediaItem.type === 'video' ? (
+              <video 
+                src={mediaItem.url} 
+                poster={mediaItem.thumbnail_url}
+                className="w-full h-full object-cover" 
+                muted 
+                playsInline 
+                autoPlay 
+                loop 
               />
-            </div>
-
-            {selectedMood === mood.id && (
-              <div className="absolute top-4 right-4 bg-primary text-on-primary w-8 h-8 rounded-full flex items-center justify-center shadow-lg">
-                <span className="material-symbols-outlined text-sm font-bold">check</span>
-              </div>
+            ) : (
+              <img src={mediaItem.url} alt="Preview" className="w-full h-full object-cover" />
             )}
-
-            <div className={`z-10 text-center w-full px-2 py-3 rounded-2xl ${
-              selectedMood === mood.id ? "bg-zinc-950/60 backdrop-blur-md" : ""
-            }`}>
-              <span className={`material-symbols-outlined mb-1 block ${
-                selectedMood === mood.id ? "text-primary" : "text-rose-200/50"
-              }`}>
-                {mood.icon}
-              </span>
-              <h3 className="text-lg font-bold text-white tracking-wide">{mood.name}</h3>
-              <p className={`text-[10px] uppercase tracking-widest mt-1 font-bold ${
-                selectedMood === mood.id ? "text-primary" : "text-rose-300/40"
-              }`}>
-                {mood.label}
-              </p>
-            </div>
+          </>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-60" />
+        <div className="absolute bottom-6 left-6 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/10">
+            {mediaItem.type === 'video' ? <VideoIcon size={18} /> : <ImageIcon size={18} />}
           </div>
-        ))}
-      </div>
-
-      {/* Volume Control - Mới thêm vào theo yêu cầu */}
-      <div className="mx-2 mt-12 bg-white/5 border border-white/5 rounded-3xl p-6 space-y-4 shadow-inner backdrop-blur-md">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Volume2 size={16} className="text-primary" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Âm lượng nhạc nền</span>
+          <div className="text-left">
+              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Đang chỉnh sửa</p>
+              <p className="text-white text-xs font-medium opacity-60">Thứ tự: {editingIndex + 1}</p>
           </div>
-          <span className="text-xl font-mono font-bold text-primary">{formData.music_volume ?? 60}%</span>
         </div>
+      </section>
+
+      {/* Input Form - MemoryWall Style */}
+      <section className="bg-zinc-900/40 border border-white/5 p-8 rounded-[2.5rem] space-y-8 shadow-xl">
         
-        <div className="relative flex items-center group">
-          <input 
-            type="range" 
-            min="0" 
-            max="100" 
-            step="1"
-            value={formData.music_volume ?? 60}
-            onChange={(e) => updateFormData({ music_volume: parseInt(e.target.value) })}
-            className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-primary"
-          />
-          {/* Track trang trí */}
-          <div 
-            className="absolute left-0 top-1/2 -translate-y-1/2 h-2 bg-primary rounded-l-lg pointer-events-none" 
-            style={{ width: `${formData.music_volume ?? 60}%` }}
-          />
-        </div>
-        <p className="text-[10px] text-zinc-500 font-medium italic">
-          * Đây là âm lượng mặc định. Bạn vẫn có thể chỉnh riêng cho từng video ở bước trước.
-        </p>
-      </div>
-
-      {/* Audio Player Element */}
-      <audio 
-        ref={audioRef} 
-        src={activeMoodData.audio} 
-        loop 
-        onEnded={() => setIsPlaying(false)}
-      />
-
-      {/* Preview Player Card */}
-      <div 
-        onClick={togglePreview}
-        className="mt-16 glass-morphism p-6 rounded-3xl border border-white/5 flex items-center gap-6 shadow-xl cursor-pointer hover:bg-white/5 transition-colors"
-      >
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isPlaying ? 'bg-rose-500 text-white' : 'bg-primary/20 text-primary'}`}>
-          <span className="material-symbols-outlined fill-1">
-            {isPlaying ? 'pause' : 'play_arrow'}
-          </span>
-        </div>
-        <div className="flex-1">
-          <div className="text-[10px] text-primary/60 uppercase tracking-widest font-bold mb-1">
-            {isPlaying ? 'ĐANG NGHE THỬ' : 'CHỌN ĐỂ NGHE THỬ'}
+        {/* FIELD 1: Tên khoảnh khắc (title_memory) */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <Edit3 size={14} className="text-rose-400" />
+            <label className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Tên khoảnh khắc / Kỉ niệm</label>
           </div>
-          <div className="text-on-surface font-semibold">{activeMoodData.name} - Giai điệu thời gian</div>
-        </div>
-        <div className="flex gap-2 h-6 items-end">
-          <motion.div
-            animate={{ height: isPlaying ? [8, 16, 12, 18, 8] : 8 }}
-            transition={{ repeat: Infinity, duration: 1 }}
-            className="w-1 bg-primary/40 rounded-full"
-          />
-          <motion.div
-            animate={{ height: isPlaying ? [12, 24, 16, 20, 12] : 12 }}
-            transition={{ repeat: Infinity, duration: 1.2 }}
-            className="w-1 bg-primary rounded-full"
-          />
-          <motion.div
-            animate={{ height: isPlaying ? [6, 12, 8, 14, 6] : 6 }}
-            transition={{ repeat: Infinity, duration: 0.8 }}
-            className="w-1 bg-primary/60 rounded-full"
-          />
-          <motion.div
-            animate={{ height: isPlaying ? [10, 20, 14, 22, 10] : 10 }}
-            transition={{ repeat: Infinity, duration: 1.1 }}
-            className="w-1 bg-primary/80 rounded-full"
+          <input 
+            type="text" 
+            value={mediaItem.title_memory || ""}
+            onChange={(e) => updateMediaField('title_memory', e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-base text-white focus:ring-2 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 font-be-vietnam-pro"
+            placeholder="Ví dụ: Lần đầu đi chơi, Kỉ niệm ngày cưới..."
           />
         </div>
+
+        <div className="h-px bg-white/5 w-full" />
+
+        {/* FIELD 2: Họ tên người nhắn (admin_author) */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <User size={14} className="text-rose-400" />
+            <label className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Họ tên của bạn</label>
+          </div>
+          <input 
+            type="text" 
+            value={mediaItem.admin_author || ""}
+            onChange={(e) => updateMediaField('admin_author', e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 font-be-vietnam-pro"
+            placeholder="Gấu của bạn, Anh xã, Admin..."
+          />
+        </div>
+
+        {/* FIELD 3: Lời nhắn gửi (admin_content) */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <MessageCircle size={14} className="text-rose-400" />
+            <label className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Lời nhắn chân tình</label>
+          </div>
+          <textarea 
+            value={mediaItem.admin_content || ""}
+            onChange={(e) => updateMediaField('admin_content', e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:ring-2 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 resize-none font-be-vietnam-pro min-h-[140px]"
+            placeholder="Viết những lời yêu thương gắn liền với ảnh này..."
+            rows={4}
+          />
+        </div>
+
+      </section>
+
+      {/* PHẦN LỊCH SỬ LỜI NHẮN */}
+      {mediaItem.messages && mediaItem.messages.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <History size={14} className="text-zinc-600" />
+            <label className="text-[10px] uppercase font-bold tracking-widest text-zinc-600">Lời nhắn đã lưu ({mediaItem.messages.length})</label>
+          </div>
+          <div className="space-y-4">
+            {mediaItem.messages
+              .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((msg: any, idx: number) => (
+                <motion.div 
+                  key={msg.id || idx}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-zinc-950/40 border border-white/5 rounded-[1.5rem] p-5 relative overflow-hidden"
+                >
+                   <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400">
+                          <User size={10} />
+                        </div>
+                        <span className="text-xs font-bold text-rose-200">{msg.author}</span>
+                      </div>
+                      <span className="text-[9px] font-mono text-zinc-600">{new Date(msg.created_at).toLocaleDateString('vi-VN')}</span>
+                   </div>
+                   <p className="text-zinc-400 text-sm italic font-light leading-relaxed">"{msg.content}"</p>
+                </motion.div>
+              ))}
+          </div>
+        </section>
+      )}
+
+      <div className="bg-rose-500/5 border border-rose-500/10 rounded-[2rem] p-6 flex gap-4 items-start">
+         <div className="mt-1 w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center text-zinc-950 shrink-0">
+            <span className="material-symbols-outlined text-[14px] font-bold">celebration</span>
+         </div>
+         <p className="text-xs text-rose-200/70 leading-relaxed font-light">
+           <b>Gợi ý</b>: Những thông tin này sẽ được lưu như lời nhắn chính thức đầu tiên cho tấm ảnh. Người xem sẽ thấy thông điệp này ngay khi xem ảnh/video.
+         </p>
       </div>
     </motion.div>
   );

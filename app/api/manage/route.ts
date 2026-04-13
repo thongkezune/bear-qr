@@ -96,7 +96,8 @@ export async function POST(req: NextRequest) {
             .ilike('moment_id', cleanId);
           
           if (keptIds.length > 0) {
-            const { error: delErr } = await deleteQuery.not('id', 'in', `(${keptIds.join(',')})`);
+            // FIX: PostgREST yêu cầu định dạng (id1,id2,...) cho toán tử IN/NOT.IN
+            const { error: delErr } = await deleteQuery.filter('id', 'not.in', `(${keptIds.join(',')})`);
             if (delErr) throw delErr;
           } else {
             const { error: delErr } = await deleteQuery;
@@ -113,9 +114,9 @@ export async function POST(req: NextRequest) {
               url: m.url,
               type: m.type,
               storage_path: m.storage_path,
+              thumbnail_url: m.thumbnail_url,
               order_index: idx,
-              mood: m.mood || 'chill',
-              music_volume: m.music_volume || 60
+              title_memory: m.title_memory || ""
             };
             if (m.id) {
               existingItems.push({ ...row, id: m.id }); 
@@ -126,10 +127,21 @@ export async function POST(req: NextRequest) {
 
           // Insert file mới
           if (newItems.length > 0) {
-            const { error: insErr } = await supabaseAdmin.from('moment_media').insert(newItems);
-            if (insErr) {
-              console.error('[API Manage] Insert error:', insErr);
-              throw insErr;
+            const { data: insertedItems, error: insErr } = await supabaseAdmin.from('moment_media').insert(newItems).select();
+            if (insErr) throw insErr;
+            
+            // Xử lý lưu tin nhắn Admin cho các file mới
+            for (const m of mediaPayload) {
+              if (m.admin_author && m.admin_content) {
+                const inserted = insertedItems?.find(ins => ins.storage_path === m.storage_path);
+                if (inserted) {
+                  await supabaseAdmin.from('media_messages').insert([{
+                    media_id: inserted.id,
+                    author: m.admin_author,
+                    content: m.admin_content
+                  }]);
+                }
+              }
             }
           }
 
@@ -138,9 +150,28 @@ export async function POST(req: NextRequest) {
             const { error: upsErr } = await supabaseAdmin
               .from('moment_media')
               .upsert(existingItems, { onConflict: 'id' });
-            if (upsErr) {
-              console.error('[API Manage] Upsert error:', upsErr);
-              throw upsErr;
+            if (upsErr) throw upsErr;
+
+            // Xử lý THÊM MỚI tin nhắn Admin (Không ghi đè, luôn tạo mới theo yêu cầu)
+            for (const m of mediaPayload) {
+              if (m.id && m.admin_author && m.admin_content) {
+                // Kiểm tra xem tin nhắn này có giống hệt tin nhắn cuối cùng không để tránh bị lặp khi nhấn lưu nhiều lần
+                const { data: lastMsg } = await supabaseAdmin
+                  .from('media_messages')
+                  .select('author, content')
+                  .eq('media_id', m.id)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                if (!lastMsg || lastMsg.author !== m.admin_author || lastMsg.content !== m.admin_content) {
+                  await supabaseAdmin.from('media_messages').insert([{
+                    media_id: m.id,
+                    author: m.admin_author,
+                    content: m.admin_content
+                  }]);
+                }
+              }
             }
           }
           // 4. Lấy lại toàn bộ danh sách MỚI NHẤT kèm ID chuẩn từ DB để trả về cho Frontend
@@ -168,12 +199,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ signedUrl: signedData.signedUrl, token: signedData.token, path: signedData.path });
 
       case 'DELETE_MEDIA':
-        // Xóa tệp thực tế trong Storage
-        if (payload.storagePath) {
-          await supabaseAdmin.storage.from('moments').remove([payload.storagePath]);
+        // 1. Lấy thông tin media trước khi xóa để biết storage_path
+        const { data: mediaToDelete } = await supabaseAdmin
+          .from('moment_media')
+          .select('storage_path, thumbnail_url')
+          .eq('id', payload.mediaId)
+          .maybeSingle();
+
+        if (mediaToDelete) {
+          const filesToRemove = [];
+          if (mediaToDelete.storage_path) filesToRemove.push(mediaToDelete.storage_path);
+          
+          // Trích xuất path từ thumbnail_url nếu nó thuộc Supabase Storage
+          if (mediaToDelete.thumbnail_url && mediaToDelete.thumbnail_url.includes('/storage/v1/object/public/moments/')) {
+            const thumbPath = mediaToDelete.thumbnail_url.split('/storage/v1/object/public/moments/')[1];
+            if (thumbPath) filesToRemove.push(thumbPath);
+          }
+
+          if (filesToRemove.length > 0) {
+            console.log(`[API Manage] Deleting files from Storage:`, filesToRemove);
+            await supabaseAdmin.storage.from('moments').remove(filesToRemove);
+          }
         }
-        // Xóa dòng trong DB
+
+        // 2. Xóa dòng trong DB (Cascade sẽ tự xóa media_messages nếu đã config, hoặc ta xóa tay)
+        await supabaseAdmin.from('media_messages').delete().eq('media_id', payload.mediaId);
         await supabaseAdmin.from('moment_media').delete().eq('id', payload.mediaId);
+        
         return NextResponse.json({ success: true });
 
       default:

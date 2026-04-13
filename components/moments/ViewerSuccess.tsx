@@ -1,14 +1,67 @@
-'use client';
-
-import { motion } from 'framer-motion';
-import { Heart, Share2, Download, ShoppingBag, Video, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Share2, Download, ShoppingBag, Video, ArrowRight, CheckCircle2, Copy, Check, X, Film, Image as ImageIcon } from 'lucide-react';
 
 interface ViewerSuccessProps {
   onReplay?: () => void;
   onManage?: () => void;
+  momentId?: string;
+  playlist?: any[]; // Danh sách toàn bộ media
 }
 
-export default function ViewerSuccess({ onReplay, onManage }: ViewerSuccessProps) {
+export default function ViewerSuccess({ onReplay, onManage, momentId, playlist = [] }: ViewerSuccessProps) {
+  const [copied, setCopied] = useState(false);
+  const [showDownloadList, setShowDownloadList] = useState(false);
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareData = {
+      title: 'BearQR Moments',
+      text: 'Xem kỉ niệm tuyệt đẹp này từ BearQR!',
+      url: shareUrl,
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.log("Share cancelled or failed:", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        alert("Không thể sao chép liên kết.");
+      }
+    }
+  };
+
+  const executeDownload = async (url: string, title?: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      
+      const ext = url.split('.').pop()?.split('?')[0] || 'file';
+      const safeTitle = (title || 'Moment').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      link.download = `BearQR_${safeTitle}.${ext}`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download error:", error);
+      window.open(url, '_blank');
+    }
+  };
+
   return (
     <motion.main 
       initial={{ opacity: 0 }}
@@ -39,14 +92,12 @@ export default function ViewerSuccess({ onReplay, onManage }: ViewerSuccessProps
           />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-60" />
           
-          {/* Floating Label */}
           <div className="absolute bottom-4 right-4 bg-rose-500/20 backdrop-blur-xl px-4 py-2 rounded-xl border border-white/10 shadow-lg">
             <p className="text-[10px] uppercase tracking-widest text-rose-300 font-bold">Lưu trữ số #2024</p>
           </div>
         </div>
       </div>
 
-      {/* Typography Stack */}
       <div className="space-y-6">
         <h2 className="text-4xl md:text-5xl font-bold font-outfit tracking-tight leading-tight text-white">
           Kỉ niệm này <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-rose-500">dành riêng</span> cho bạn
@@ -56,7 +107,6 @@ export default function ViewerSuccess({ onReplay, onManage }: ViewerSuccessProps
         </p>
       </div>
 
-      {/* Action Cards (Main CTAs) */}
       <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
         <button 
           onClick={onReplay}
@@ -71,15 +121,19 @@ export default function ViewerSuccess({ onReplay, onManage }: ViewerSuccessProps
           </div>
         </button>
 
-        <button className="group relative bg-gradient-to-r from-rose-400 to-rose-600 text-white p-[1px] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-rose-950/20">
-          <div className="bg-zinc-950 rounded-2xl p-6 flex flex-col items-start gap-3 text-left group-hover:bg-transparent transition-all">
+        <a 
+          href="https://bearqr.vn/shop"
+          target="_blank"
+          className="group relative bg-gradient-to-r from-rose-400 to-rose-600 text-white p-[1px] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-rose-950/20"
+        >
+          <div className="bg-zinc-950 rounded-2xl p-6 flex flex-col items-start gap-3 text-left group-hover:bg-transparent transition-all h-full">
             <ShoppingBag className="w-8 h-8 text-rose-400 group-hover:text-white" />
             <div>
               <h3 className="font-bold text-lg">Tiếp tục mua sắm</h3>
               <p className="text-xs text-zinc-500 group-hover:text-rose-200">Khám phá bộ sưu tập BearQR</p>
             </div>
           </div>
-        </button>
+        </a>
 
         <button 
           onClick={onManage}
@@ -95,36 +149,110 @@ export default function ViewerSuccess({ onReplay, onManage }: ViewerSuccessProps
         </button>
       </div>
 
-      {/* Secondary Interactions */}
-      <div className="mt-12 flex items-center justify-center gap-8">
-        <button className="flex flex-col items-center gap-2 group">
-          <div className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center group-hover:bg-rose-500/10 group-hover:border-rose-500/30 transition-all">
-            <Heart className="w-5 h-5 text-zinc-400 group-hover:text-rose-400 fill-transparent group-hover:fill-rose-400/20" />
+      <div className="mt-12 flex items-center justify-center gap-12">
+        <button 
+          onClick={handleShare}
+          className="flex flex-col items-center gap-3 group relative"
+        >
+          <div className="w-14 h-14 rounded-full border border-zinc-800 flex items-center justify-center group-hover:bg-rose-500/10 group-hover:border-rose-500/30 transition-all shadow-lg active:scale-90">
+            {copied ? <Check className="w-6 h-6 text-emerald-400" /> : <Share2 className="w-6 h-6 text-zinc-400 group-hover:text-rose-400" />}
           </div>
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500">Thích</span>
+          <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 group-hover:text-rose-400 transition-colors">
+            {copied ? "Đã sao chép" : "Chia sẻ"}
+          </span>
         </button>
 
-        <button className="flex flex-col items-center gap-2 group">
-          <div className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center group-hover:bg-rose-500/10 group-hover:border-rose-500/30 transition-all">
-            <Share2 className="w-5 h-5 text-zinc-400 group-hover:text-rose-400" />
+        <button 
+          onClick={() => setShowDownloadList(true)}
+          className="flex flex-col items-center gap-3 group"
+        >
+          <div className="w-14 h-14 rounded-full border border-zinc-800 flex items-center justify-center group-hover:bg-rose-500/10 group-hover:border-rose-500/30 transition-all shadow-lg active:scale-90">
+            <Download className="w-6 h-6 text-zinc-400 group-hover:text-rose-400" />
           </div>
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500">Chia sẻ</span>
-        </button>
-
-        <button className="flex flex-col items-center gap-2 group">
-          <div className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center group-hover:bg-rose-500/10 group-hover:border-rose-500/30 transition-all">
-            <Download className="w-5 h-5 text-zinc-400 group-hover:text-rose-400" />
-          </div>
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500">Tải về</span>
+          <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500 group-hover:text-rose-400 transition-colors">Tải về</span>
         </button>
       </div>
 
-      {/* Semantic Ending Badge */}
       <div className="mt-20 opacity-40">
         <span className="text-[10px] tracking-[0.4em] uppercase font-medium text-zinc-500">
           The End • The Luminous Archive
         </span>
       </div>
+
+      {/* Download Modal */}
+      <AnimatePresence>
+        {showDownloadList && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDownloadList(false)}
+              className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed bottom-0 left-0 right-0 z-[101] bg-zinc-900 border-t border-white/10 rounded-t-[2.5rem] p-8 max-h-[85vh] overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="text-left">
+                  <h2 className="text-2xl font-bold font-outfit text-white">Lưu giữ kỉ niệm</h2>
+                  <p className="text-zinc-500 text-sm">Chọn nội dung bạn muốn tải về máy</p>
+                </div>
+                <button 
+                  onClick={() => setShowDownloadList(false)}
+                  className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                {playlist.length > 0 ? (
+                  playlist.map((item, idx) => (
+                    <div 
+                      key={item.id || idx}
+                      className="group p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 hover:bg-white/10 transition-all"
+                    >
+                      <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0">
+                        <img 
+                          src={item.thumbnail_url || item.url} 
+                          alt={item.title_memory} 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          {item.type === 'video' ? <Film size={16} className="text-white" /> : <ImageIcon size={16} className="text-white" />}
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 text-left">
+                        <h4 className="font-bold text-white text-sm line-clamp-1">{item.title_memory || `Kỉ niệm #${idx + 1}`}</h4>
+                        <p className="text-zinc-500 text-xs uppercase tracking-widest mt-1">
+                          {item.type === 'video' ? 'Video' : 'Hình ảnh'}
+                        </p>
+                      </div>
+
+                      <button 
+                        onClick={() => executeDownload(item.url, item.title_memory)}
+                        className="w-10 h-10 rounded-full bg-rose-500 text-zinc-950 flex items-center justify-center hover:scale-110 active:scale-90 transition-all shadow-lg shadow-rose-500/20"
+                      >
+                        <Download size={18} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-20 text-center text-zinc-500">
+                    Chưa có kỉ niệm để tải về
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.main>
   );
 }

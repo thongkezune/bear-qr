@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { StepIndicator } from "./StepIndicator";
 import { SetupStep1 } from "./SetupStep1";
 import { SetupStep2 } from "./SetupStep2";
+import { SetupStep3 } from "./SetupStep3";
 import { SetupStep4 } from "./SetupStep4";
 import { SetupStep5 } from "./SetupStep5";
 import { AdminHome } from "./AdminHome";
@@ -21,15 +22,29 @@ interface MomentWizardProps {
 
 export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword = "" }: MomentWizardProps) => {
   const [step, setStep] = useState(initialStep);
-  const totalSteps = 5;
+  const totalSteps = 6;
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     adminPassword: adminPassword,
     adminHint: "",
+    title: "Kỉ niệm của tôi",
     isPrivate: true,
     viewerPassword: "BEAR2024",
     viewerHint: "",
-    media: [],
+    media: [] as { 
+      id?: string; 
+      url: string; 
+      type: string; 
+      title_memory?: string; 
+      admin_author?: string; 
+      admin_content?: string; 
+      storage_path?: string;
+      thumbnail_url?: string; // Thêm trường ảnh đại diện
+      isPlaceholder?: boolean; 
+    }[],
   });
+
+  const [uploadingFiles, setUploadingFiles] = useState<{[key: string]: number}>({});
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
@@ -46,7 +61,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       try {
         const { data: moment, error: mError } = await supabase
           .from('moments')
-          .select('*, media:moment_media(*)')
+          .select('*, media:moment_media(*, messages:media_messages(*))')
           .ilike('short_id', momentId.trim().toLowerCase())
           .limit(1)
           .maybeSingle();
@@ -54,8 +69,20 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         if (mError) throw mError;
 
         if (moment) {
-          // Sắp xếp media theo index
-          const sortedMedia = (moment.media || []).sort((a: any, b: any) => a.order_index - b.order_index);
+          // Sắp xếp media theo index và lấy danh sách tin nhắn
+          const sortedMedia = (moment.media || []).sort((a: any, b: any) => a.order_index - b.order_index).map((m: any) => {
+            // Lấy tin nhắn cuối cùng (mới nhất) làm mặc định cho ô nhập
+            const lastMsg = m.messages && m.messages.length > 0 
+              ? [...m.messages].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+              : null;
+              
+            return {
+              ...m,
+              messages: m.messages || [], // Giữ lại toàn bộ để hiện lịch sử
+              admin_author: m.admin_author || lastMsg?.author || "",
+              admin_content: m.admin_content || lastMsg?.content || ""
+            };
+          });
           
           setFormData(prev => ({
             ...prev,
@@ -95,7 +122,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             viewer_password_hash: formData.isPrivate ? await hashPassword(formData.viewerPassword || "BEAR2024") : null,
             viewer_hint: formData.isPrivate ? formData.viewerHint : null,
             is_private: formData.isPrivate,
-            title: "Kỉ niệm của tôi"
+            title: formData.title || "Kỉ niệm của tôi"
           }
         })
       });
@@ -117,10 +144,13 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             payload: { media: formData.media }
           })
         });
-        if (!resMedia.ok) throw new Error('Không thể lưu danh sách media.');
+        if (!resMedia.ok) {
+          const errData = await resMedia.json();
+          throw new Error(errData.error || 'Không thể lưu danh sách media.');
+        }
       }
       
-      setStep(5);
+      setStep(6);
     } catch (err: any) {
       console.error("Error activating moment:", err);
       alert("Có lỗi xảy ra: " + (err.message || "Vui lòng thử lại."));
@@ -145,7 +175,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             viewer_password_hash: newSettings.isPrivate ? await hashPassword(newSettings.viewerPassword || "BEAR2024") : null,
             viewer_hint: newSettings.isPrivate ? newSettings.viewerHint : null,
             is_private: newSettings.isPrivate,
-            title: "Kỉ niệm của tôi"
+            title: formData.title || "Kỉ niệm của tôi"
           }
         })
       });
@@ -200,15 +230,260 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       return;
     }
 
-    if (step === 4) {
+    if (step === 5) {
       handleFinalSave();
+    } else if (step === 3) {
+      // Nếu có ảnh mới tải lên, bắt đầu chỉnh sửa từ ảnh mới đầu tiên
+      if (formData.media && formData.media.length > uploadStartIndex.current) {
+        setEditingIndex(uploadStartIndex.current);
+        setStep(4);
+      } else {
+        // Nếu không có ảnh mới, có thể sang bước cài đặt hoặc giữ nguyên
+        setStep(step + 1);
+      }
     } else if (step < totalSteps) {
       setStep(step + 1);
     }
   };
 
   const prevStep = () => {
-    if (step > 1) setStep(step - 1);
+    if (step === 4) setStep(2); // Quay về trang chủ khi hủy bỏ chỉnh sửa
+    else if (step > 1) setStep(step - 1);
+  };
+
+  // Ghi nhớ vị trí bắt đầu của các ảnh mới tải lên trong phiên này
+  const uploadStartIndex = useRef<number>(0);
+  useEffect(() => {
+    if (step === 3) {
+      uploadStartIndex.current = formData.media?.length || 0;
+    }
+  }, [step]);
+
+  // HÀM TRÍCH XUẤT ẢNH TỪ VIDEO
+  const generateVideoThumbnail = (file: File): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      const canvas = document.createElement("canvas");
+      const url = URL.createObjectURL(file);
+
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+
+      video.onloadeddata = () => {
+        // Chụp tại giây đầu tiên
+        video.currentTime = 1;
+      };
+
+      video.onseeked = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          resolve(blob);
+        }, "image/jpeg", 0.7);
+      };
+
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+    });
+  };
+
+  // HÀM TẢI LÊN TOÀN CỤC (Background Upload)
+  const handleGlobalUpload = async (files: FileList) => {
+    if (!momentId) return;
+
+    // 1. Ghi nhớ vị trí bắt đầu để tự động chuyển bước sau này
+    const currentLength = formData.media?.length || 0;
+    uploadStartIndex.current = currentLength;
+
+    // 2. Tạo Placeholder ngay lập tức để SetupStep3 nhận diện được
+    const newPlaceholders = Array.from(files).map((file, i) => ({
+      url: "", // Trống vì chưa có URL
+      type: file.type.startsWith('video') ? 'video' : 'image',
+      storage_path: `pending-${Date.now()}-${i}`,
+      name: file.name,
+      title_memory: "",
+      isPlaceholder: true
+    }));
+
+    const updatedMedia = [...(formData.media || []), ...newPlaceholders];
+    updateFormData({ media: updatedMedia });
+
+    try {
+      // 3. Tiến hành Upload từng file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const placeholderPath = newPlaceholders[i].storage_path;
+        
+        // Cập nhật tiến trình: Bắt đầu
+        setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 10 }));
+
+        // Lấy Signed URL từ Backend
+        const res = await fetch('/api/manage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            momentId,
+            adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
+            action: 'GET_UPLOAD_SIGNED_URL',
+            payload: { fileName: `${Date.now()}_${file.name}` }
+          })
+        });
+
+        const { signedUrl, token, path: storagePath } = await res.json();
+
+        // Upload trực tiếp lên Supabase Storage với tiến trình thực tế
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', signedUrl);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        
+        // Theo dõi tiến trình upload thực tế
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 90);
+            setUploadingFiles(prev => ({ ...prev, [placeholderPath]: percent }));
+          }
+        };
+
+        const uploadPromise = new Promise((resolve, reject) => {
+          xhr.onload = () => xhr.status === 200 ? resolve(true) : reject();
+          xhr.onerror = () => reject();
+          xhr.send(file);
+        });
+
+        await uploadPromise;
+        setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 100 }));
+
+        // Tạo public URL
+        const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${storagePath}`;
+        
+        // Tạo thumbnail nếu là video
+        let finalThumbnailUrl = "";
+        if (file.type.startsWith('video/')) {
+           try {
+              const thumbBlob = await generateVideoThumbnail(file);
+              const thumbFileName = `thumb_${Date.now()}.jpg`;
+              const thumbRes = await fetch('/api/manage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  momentId,
+                  adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
+                  action: 'GET_UPLOAD_SIGNED_URL',
+                  payload: { fileName: thumbFileName }
+                })
+              });
+              const { signedUrl: tUrl, token: tToken, path: tPath } = await thumbRes.json();
+              await fetch(tUrl, { method: 'PUT', body: thumbBlob, headers: { 'Authorization': `Bearer ${tToken}` } });
+              finalThumbnailUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${tPath}`;
+           } catch (e) { console.error("Thumbnail error:", e); }
+        }
+
+        // Cập nhật State: Thay thế placeholder bằng dữ liệu thực
+        // BẢO VỆ DỮ LIỆU: Dùng functional update để không làm mất title/content đang nhập
+        setFormData(prev => {
+          const newMedia = [...prev.media];
+          const idx = newMedia.findIndex(m => m.storage_path === placeholderPath);
+          if (idx !== -1) {
+            newMedia[idx] = {
+              ...newMedia[idx], 
+              url: publicUrl,
+              storage_path: storagePath,
+              thumbnail_url: finalThumbnailUrl,
+              isPlaceholder: false
+            };
+          }
+          
+          // Tự động đồng bộ lên DB ngay sau khi một tệp hoàn tất cập nhật state
+          const syncDB = async (latestMedia: any[]) => {
+            try {
+              const adminHash = await hashPassword(prev.adminPassword || "admin123");
+              const syncRes = await fetch('/api/manage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  momentId,
+                  adminPasswordHash: adminHash,
+                  action: 'SAVE_MEDIA_LIST',
+                  payload: { media: latestMedia }
+                })
+              });
+              const result = await syncRes.json();
+              if (result.success && result.media) {
+                 setFormData(f => ({ ...f, media: result.media }));
+              }
+            } catch (err) { console.error("Auto Sync Error:", err); }
+          };
+          
+          syncDB(newMedia);
+          return { ...prev, media: newMedia };
+        });
+
+        // Dọn dẹp tiến trình
+        setTimeout(() => {
+          setUploadingFiles(prev => {
+            const next = { ...prev };
+            delete next[placeholderPath];
+            return next;
+          });
+        }, 1000);
+      }
+    } catch (err: any) {
+      console.error("Upload Error:", err);
+      alert("Lỗi tải lên: " + (err.message || "Vui lòng thử lại"));
+    }
+  };
+
+  const handleRemoveMedia = async (storagePath: string) => {
+    if (!momentId) return;
+
+    // Tìm item cụ thể để lấy ID database nếu có
+    const itemToRemove = formData.media.find(m => m.storage_path === storagePath);
+    const newList = formData.media.filter(m => m.storage_path !== storagePath);
+    
+    // Cập nhật UI ngay lập tức
+    updateFormData({ media: newList });
+
+    try {
+      const adminHash = await hashPassword(formData.adminPassword || "admin123");
+      
+      if (itemToRemove?.id) {
+        // Trường hợp tin nhắn đã tồn tại trong DB -> Gọi xóa vật lý (DB + Storage)
+        await fetch('/api/manage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            momentId,
+            adminPasswordHash: adminHash,
+            action: 'DELETE_MEDIA',
+            payload: { 
+              mediaId: itemToRemove.id,
+              storagePath: itemToRemove.storage_path // Optional, API sẽ tự tìm nếu thiếu
+            }
+          })
+        });
+        console.log(`[MomentWizard] Physically deleted media: ${itemToRemove.id}`);
+      } else {
+        // Trường hợp tệp chưa có ID (vừa upload) -> Đồng bộ lại danh sách
+        await fetch('/api/manage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            momentId,
+            adminPasswordHash: adminHash,
+            action: 'SAVE_MEDIA_LIST',
+            payload: { media: newList }
+          })
+        });
+      }
+    } catch (err) {
+      console.error("Delete Error:", err);
+    }
   };
 
   const renderStep = () => {
@@ -221,7 +496,12 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           <AdminHome 
             momentId={momentId} 
             onAdd={() => setStep(3)} 
-            onEdit={() => setStep(3)} 
+            onEdit={(id) => {
+              const idx = formData.media.findIndex(m => m.id === id);
+              setEditingIndex(idx >= 0 ? idx : 0);
+              setStep(4);
+            }} 
+            onRemove={handleRemoveMedia}
             settings={{
               isPrivate: formData.isPrivate,
               viewerPassword: formData.viewerPassword,
@@ -231,10 +511,29 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           />
         );
       case 3:
-        return <SetupStep2 {...props} />;
+        return (
+          <SetupStep2 
+            {...props} 
+            onUpload={handleGlobalUpload}
+            uploadingFiles={uploadingFiles}
+            onEditItem={(idx) => {
+              setEditingIndex(idx);
+              setStep(4);
+            }}
+          />
+        );
       case 4:
-        return <SetupStep4 {...props} />;
+        return (
+          <SetupStep3 
+            {...props} 
+            editingIndex={editingIndex ?? 0}
+            uploadingFiles={uploadingFiles}
+            onBack={() => setStep(3)}
+          />
+        );
       case 5:
+        return <SetupStep4 {...props} />;
+      case 6:
         return <SetupStep5 onGoToStep={(n) => setStep(n)} onHome={() => onBack?.()} />;
       default:
         return <SetupStep1 {...props} />;
@@ -258,7 +557,14 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             BearQR Portal
           </span>
         </div>
-        <StepIndicator currentStep={step} totalSteps={totalSteps} />
+        <div className="flex flex-col items-center">
+          <StepIndicator currentStep={step} totalSteps={totalSteps} />
+          {step === 4 && (
+            <span className="text-[8px] font-bold text-rose-400 uppercase tracking-widest mt-1 animate-pulse">
+              Đang biên tập nội dung
+            </span>
+          )}
+        </div>
       </header>
 
       {/* Main Content */}
@@ -276,8 +582,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         </AnimatePresence>
       </main>
 
-      {/* Bottom Actions - Hidden on Step 2 (Home) and Step 5 (Done) */}
-      {step !== 2 && step < 5 && (
+      {/* Bottom Actions - Hidden on Step 2 (Home) and Step 6 (Done) */}
+      {step !== 2 && step < 6 && (
         <footer className="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-8 pb-10 pt-6 bg-zinc-950/40 backdrop-blur-3xl rounded-t-[2.5rem] border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
           <button
             onClick={step === 1 ? onBack : prevStep}
@@ -287,7 +593,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           >
             <ArrowLeft size={16} className="mr-2" />
             <span className="font-be-vietnam text-xs font-bold uppercase tracking-widest">
-              {step === 1 ? "Thoát" : "Quay lại"}
+              {step === 4 ? "Hủy bỏ" : (step === 1 ? "Thoát" : "Quay lại")}
             </span>
           </button>
 
@@ -297,12 +603,12 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             className="flex items-center justify-center bg-gradient-to-r from-rose-300 to-rose-500 text-zinc-950 rounded-2xl px-10 py-4 shadow-xl shadow-rose-500/20 hover:brightness-110 transition-all active:scale-[0.98] duration-150 disabled:opacity-70"
           >
             <span className="font-be-vietnam text-xs font-bold uppercase tracking-widest mr-2">
-              {isSaving ? "Đang xử lý..." : (step === 4 ? "Lưu và kích hoạt" : "Tiếp theo")}
+              {isSaving ? "Đang xử lý..." : (step === 5 ? "Lưu và kích hoạt" : (step === 4 ? "Lưu lời nhắn" : "Tiếp theo"))}
             </span>
             {isSaving ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
-              step === 4 ? <Check size={18} /> : <ArrowRight size={18} />
+              step === 5 ? <Check size={18} /> : <ArrowRight size={18} />
             )}
           </button>
         </footer>

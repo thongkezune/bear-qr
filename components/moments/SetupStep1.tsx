@@ -35,6 +35,24 @@ export const SetupStep1 = ({ formData, updateFormData }: SetupStep1Props) => {
       <div className="space-y-6">
         <div className="group">
           <label className="block text-xs font-semibold text-on-surface-variant mb-2 tracking-widest uppercase px-1">
+            Tên kỉ niệm
+          </label>
+          <div className="relative">
+            <input
+              className="w-full px-5 py-4 rounded-2xl border-none text-on-surface placeholder:text-zinc-600 focus:ring-2 focus:ring-primary/50 text-base glass-morphism outline-none transition-all"
+              placeholder="Ví dụ: Kỉ niệm ngày cưới, Tặng người thương..."
+              type="text"
+              value={formData.title || ""}
+              onChange={(e) => updateFormData({ title: e.target.value })}
+            />
+            <span className="absolute right-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-zinc-500">
+              edit
+            </span>
+          </div>
+        </div>
+
+        <div className="group">
+          <label className="block text-xs font-semibold text-on-surface-variant mb-2 tracking-widest uppercase px-1">
             Mật khẩu quản trị
           </label>
           <div className="relative">

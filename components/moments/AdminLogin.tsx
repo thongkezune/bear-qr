@@ -43,7 +43,7 @@ export default function AdminLogin({ onLogin, onBack, adminHint, hashedPassword 
   return (
     <div className="min-h-screen w-full flex flex-col text-white bg-zinc-950 relative overflow-hidden">
       {/* Background Ambience */}
-      <div className="fixed inset-0 z-0">
+      <div className="absolute inset-0 z-0">
         <div className="absolute top-1/4 -right-24 w-96 h-96 bg-rose-500/5 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-1/4 -left-24 w-80 h-80 bg-rose-500/5 rounded-full blur-[100px] pointer-events-none" />
         <div 
@@ -53,7 +53,7 @@ export default function AdminLogin({ onLogin, onBack, adminHint, hashedPassword 
       </div>
 
       {/* Top Navigation Shell */}
-      <header className="w-full top-0 sticky z-50 bg-zinc-950/20 backdrop-blur-xl flex justify-between items-center px-6 py-4 border-b border-white/5">
+      <header className="w-full top-0 sticky z-50 bg-zinc-950/20 flex justify-between items-center px-6 py-4 border-b border-white/5">
         <button 
           onClick={onBack}
           className="flex items-center gap-4 hover:opacity-80 transition-opacity"
@@ -68,6 +68,7 @@ export default function AdminLogin({ onLogin, onBack, adminHint, hashedPassword 
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
           className="w-full max-w-[420px] space-y-10"
         >
           {/* Header Section */}
@@ -158,7 +159,7 @@ export default function AdminLogin({ onLogin, onBack, adminHint, hashedPassword 
       </main>
 
       {/* Footer Decoration */}
-      <footer className="fixed bottom-0 left-0 w-full p-8 flex justify-center opacity-30 pointer-events-none">
+      <footer className="relative bottom-0 left-0 w-full p-8 flex justify-center opacity-30 pointer-events-none">
         <div className="h-px w-full max-w-lg bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </footer>
     </div>

@@ -13,6 +13,8 @@ interface MemoryItem {
   type: string;
   order_index: number;
   created_at: string;
+  storage_path: string;
+  title_memory?: string;
   // Các trường ảo để tương thích giao diện cũ
   title?: string;
 }
@@ -21,6 +23,7 @@ interface AdminHomeProps {
   momentId?: string;
   onAdd: () => void;
   onEdit: (id: string) => void;
+  onRemove?: (storagePath: string) => void;
   settings?: {
     isPrivate: boolean;
     viewerPassword?: string;
@@ -29,7 +32,7 @@ interface AdminHomeProps {
   onSaveSettings?: (s: any) => Promise<void>;
 }
 
-export const AdminHome = ({ momentId, onAdd, onEdit, settings, onSaveSettings }: AdminHomeProps) => {
+export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveSettings }: AdminHomeProps) => {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewItem, setPreviewItem] = useState<MemoryItem | null>(null);
@@ -171,7 +174,7 @@ export const AdminHome = ({ momentId, onAdd, onEdit, settings, onSaveSettings }:
                 <div className="flex-1 flex flex-col justify-between py-1">
                   <div>
                     <h4 className="text-base font-bold text-white line-clamp-1 group-hover:text-rose-400 transition-colors">
-                      Kỉ niệm #{item.order_index + 1}
+                      {item.title_memory || `Kỉ niệm #${item.order_index + 1}`}
                     </h4>
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center gap-1 text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
@@ -189,7 +192,15 @@ export const AdminHome = ({ momentId, onAdd, onEdit, settings, onSaveSettings }:
                       <Edit2 size={14} />
                     </button>
                     <button 
-                      onClick={(e) => { e.stopPropagation(); /* TODO: Handle Delete */ }}
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (confirm("Bạn có chắc chắn muốn xóa kỉ niệm này không?")) {
+                          // Cập nhật giao diện cục bộ ngay lập tức
+                          setMemories(prev => prev.filter(m => m.storage_path !== item.storage_path));
+                          // Gọi hàm xóa ở cấp độ quản lý (Wizard) để đồng bộ DB
+                          onRemove?.(item.storage_path); 
+                        }
+                      }}
                       className="p-2 rounded-xl bg-white/5 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 transition-all"
                     >
                       <Trash2 size={14} />

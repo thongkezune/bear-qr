@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, Share2, Download, SkipForward, Play, Loader2, AlertCircle, ShoppingCart, CheckCircle } from "lucide-react";
+import { Heart, Share2, Download, SkipForward, Play, Loader2, AlertCircle, ShoppingCart, CheckCircle, Sparkles, MessageCircle } from "lucide-react";
 import ViewerEntry from "./ViewerEntry";
 import PasswordGate from "./PasswordGate";
 import ViewerSuccess from "./ViewerSuccess";
 import AdminLogin from "./AdminLogin";
 import MemoryWall from "./MemoryWall";
 import { MomentWizard } from "./MomentWizard";
+import { DanmakuLayer } from "./DanmakuLayer";
 import { supabase } from "@/lib/supabase";
-import { AUDIO_MOODS } from "./SetupStep3";
+import { AUDIO_MOODS } from "./constants";
 
 type ViewState = "loading" | "error" | "not_found" | "entry" | "password" | "admin_login" | "admin_dashboard" | "intro" | "player" | "success";
 
@@ -28,7 +29,8 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
   const [adminPassword, setAdminPassword] = useState<string>('');
   const [isMediaEnded, setIsMediaEnded] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [replayKey, setReplayKey] = useState(0); // Để force re-render video/img khi nhấn replay
+  const [replayKey, setReplayKey] = useState(0); 
+  const [isDanmakuEnabled, setIsDanmakuEnabled] = useState(true); // Mặc định bật Ký ức trôi
   const videoRef = useRef<HTMLVideoElement>(null);
   const bgAudioRef = useRef<HTMLAudioElement>(null);
 
@@ -44,7 +46,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
       
       const { data: moments, error: fetchError } = await supabase
         .from("moments")
-        .select("*, playlist:moment_media(*)")
+        .select("*, playlist:moment_media(*, messages:media_messages(*))")
         .eq("short_id", momentId.toLowerCase())
         .limit(1);
 
@@ -305,6 +307,13 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                   )}
                 </div>
 
+                {/* Danmaku Layer - Tin nhắn trôi */}
+                <DanmakuLayer 
+                  messages={currentMedia?.messages || []} 
+                  isEnabled={isDanmakuEnabled && !isMediaEnded && isPlaying} 
+                  resetKey={replayKey}
+                />
+
                 {/* Video Playback Overlay */}
                 <AnimatePresence>
                   {isMediaEnded && (
@@ -365,26 +374,62 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                   )}
                 </AnimatePresence>
 
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 pt-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+
+                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 pt-20 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none">
                   <div className="flex justify-between items-end mb-3">
-                    <div className="space-y-0.5">
+                    <div className="space-y-1.5 flex-1">
                       <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400/80">Nội dung {currentMediaIndex + 1} / {momentData?.playlist?.length || 1}</span>
-                      <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight font-outfit">{momentData.title}</h2>
+                      <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight font-outfit pt-2">
+                        {currentMedia?.title_memory || momentData?.title || "Kỉ niệm vô giá"}
+                      </h2>
                     </div>
                   </div>
-                  <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                      key={`${currentMedia?.id}-${replayKey}`}
-                      initial={{ width: 0 }} 
-                      animate={{ width: (isPlaying && !isMediaEnded) ? "100%" : 0 }} 
-                      transition={{ duration: currentMedia?.type === "video" ? 999999 : 5, ease: "linear" }} 
-                      onAnimationComplete={() => { if (currentMedia?.type !== "video") handleMediaEnd(); }} 
-                      className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" 
-                    />
-                  </div>
+                  {/* Progress Bar - Chỉ dành cho video */}
+                  {currentMedia?.type === "video" && (
+                    <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                      <motion.div 
+                        key={`${currentMedia?.id}-${replayKey}`}
+                        initial={{ width: 0 }} 
+                        animate={{ width: (isPlaying && !isMediaEnded) ? "100%" : 0 }} 
+                        transition={{ duration: 999999, ease: "linear" }} 
+                        className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" 
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
+
+            {/* Quick Actions Sidebar - Thuận tay cái bên phải */}
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setIsDanmakuEnabled(!isDanmakuEnabled)}
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center backdrop-blur-xl border transition-all shadow-xl ${
+                  isDanmakuEnabled 
+                    ? "bg-rose-500 border-rose-400 text-white shadow-rose-500/20" 
+                    : "bg-zinc-900/40 border-white/10 text-zinc-500"
+                }`}
+              >
+                <div className="relative">
+                  <Sparkles size={20} className={isDanmakuEnabled ? "fill-white" : ""} />
+                  {isDanmakuEnabled && (
+                    <motion.div 
+                      layoutId="active-dot" 
+                      className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full border border-rose-500"
+                    />
+                  )}
+                </div>
+              </motion.button>
+
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setIsWallExpanded(!isWallExpanded)}
+                className="w-12 h-12 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center shadow-xl hover:bg-white/5"
+              >
+                 <MessageCircle size={20} />
+              </motion.button>
+            </div>
 
             <motion.div animate={{ height: isWallExpanded ? "60%" : "100px", backgroundColor: isWallExpanded ? "rgba(9, 9, 11, 0.98)" : "rgba(9, 9, 11, 0.2)" }} className="relative z-20 w-full backdrop-blur-3xl border-t border-white/10 rounded-t-[2.5rem] overflow-hidden">
               <div onClick={() => setIsWallExpanded(!isWallExpanded)} className="w-full p-6 flex flex-col items-center cursor-pointer">
@@ -407,7 +452,12 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
         {viewState === "success" && (
           <motion.div key="success" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={transitionConfig} className="w-full h-full overflow-y-auto custom-scrollbar bg-black">
             <div className="py-20 px-6">
-              <ViewerSuccess onReplay={() => { setCurrentMediaIndex(0); setViewState("player"); }} onManage={() => setViewState("admin_login")} />
+              <ViewerSuccess 
+                onReplay={() => { setCurrentMediaIndex(0); setViewState("player"); }} 
+                onManage={() => setViewState("admin_login")} 
+                momentId={momentId}
+                playlist={momentData?.playlist || []}
+              />
               <footer className="text-center pt-20 pb-10 opacity-30 font-be-vietnam-pro"><p className="text-[9px] tracking-[0.4em] uppercase font-light text-zinc-500">BearQR Moments . Lưu giữ chân tình</p></footer>
             </div>
           </motion.div>
