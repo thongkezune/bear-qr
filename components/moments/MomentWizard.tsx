@@ -122,7 +122,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             viewer_password_hash: formData.isPrivate ? await hashPassword(formData.viewerPassword || "BEAR2024") : null,
             viewer_hint: formData.isPrivate ? formData.viewerHint : null,
             is_private: formData.isPrivate,
-            title: formData.title || "Kỉ niệm của tôi"
+            title: formData.title || "Kỉ niệm của tôi",
+            mood: 'none' // Ép buộc không có nhạc nền mặc định
           }
         })
       });
@@ -327,6 +328,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       storage_path: `pending-${Date.now()}-${i}`,
       name: file.name,
       title_memory: "",
+      mood: "none",
       isPlaceholder: true
     }));
 
@@ -336,6 +338,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     // 3. Tiến trình tải lên Tuần tự (Sequential) để ổn định trên Mobile
     const runSequentialUpload = async () => {
       const fileArray = Array.from(files);
+      // Khởi tạo danh sách tạm thời dựa trên placeholders đã tạo
+      let currentMediaItems = [...updatedMedia];
       
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
@@ -382,23 +386,20 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
 
           const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${storagePath}`;
           
-          // C. Cập nhật State & DB (Không lỗi Race Condition)
-          let latestMediaState: any[] = [];
-          
-          setFormData(prev => {
-            const newMedia = prev.media.map((m: any) => 
-              m.storage_path === placeholderPath 
-                ? { ...m, url: publicUrl, storage_path: storagePath, isPlaceholder: false } 
-                : m
-            );
-            latestMediaState = newMedia;
-            return { ...prev, media: newMedia };
-          });
+          // C. Cập nhật Danh sách cục bộ & State & DB
+          currentMediaItems = currentMediaItems.map((m: any) => 
+            m.storage_path === placeholderPath 
+              ? { ...m, url: publicUrl, storage_path: storagePath, isPlaceholder: false } 
+              : m
+          );
 
-          // Gọi Sync DB sau khi đã mượn được state mới nhất
-          await syncMediaList(latestMediaState);
+          // Cập nhật UI
+          setFormData(prev => ({ ...prev, media: currentMediaItems }));
 
-          // D. Xử lý Thumbnail (Không chặn tiến trình chính)
+          // Lưu vào Database (Đảm bảo có URL mới nhất)
+          await syncMediaList(currentMediaItems);
+
+          // D. Xử lý Thumbnail (Nếu là Video) - Chạy ngầm, không đợi
           if (file.type.startsWith('video/')) {
             generateAndUploadThumbnail(file, storagePath);
           }
@@ -458,8 +459,16 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       }
     };
 
-    // Hàm đồng bộ DB tách riêng
+    // Hàm đồng bộ DB tách riêng (Có cơ chế Merge để tránh reset tiến trình)
     const syncMediaList = async (latestMedia: any[]) => {
+      // CHẶN: Không bao giờ gửi khung chờ (placeholder) lên Database
+      const finalizedOnly = latestMedia.filter((m: any) => !m.isPlaceholder && m.url && m.url !== "");
+      
+      if (finalizedOnly.length === 0 && latestMedia.length > 0) {
+        console.log("[MomentWizard] Nothing finalized yet, skipping sync.");
+        return;
+      }
+
       try {
         const adminHash = await hashPassword(formData.adminPassword || "admin123");
         const syncRes = await fetch('/api/manage', {
@@ -469,12 +478,29 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             momentId,
             adminPasswordHash: adminHash,
             action: 'SAVE_MEDIA_LIST',
-            payload: { media: latestMedia }
+            payload: { media: finalizedOnly }
           })
         });
         const result = await syncRes.json();
+        
         if (result.success && result.media) {
-           setFormData(f => ({ ...f, media: result.media }));
+           // CHIẾN THUẬT MERGE: 
+           // Giữ lại tất cả các placeholders đang tải ở Client mà Server chưa biết
+           setFormData(f => {
+             const serverMedia = result.media;
+             const localPlaceholders = f.media.filter((m: any) => m.isPlaceholder);
+             
+             // Gộp: Các mục từ server + các mục đang tải ở local
+             const mergedMedia = [...serverMedia];
+             
+             localPlaceholders.forEach((lp: any) => {
+                if (!mergedMedia.find((sm: any) => sm.storage_path === lp.storage_path)) {
+                   mergedMedia.push(lp);
+                }
+             });
+
+             return { ...f, media: mergedMedia };
+           });
         }
       } catch (err) { console.error("Sync DB Error:", err); }
     };
@@ -517,6 +543,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         console.log(`[MomentWizard] Physically deleted media: ${itemToRemove.id}`);
       } else {
         // Trường hợp tệp chưa có ID (vừa upload) -> Đồng bộ lại danh sách
+        // Chú ý: Filter placeholder ở đây cũng quan trọng
+        const finalizedOnly = newList.filter((m: any) => !m.isPlaceholder && m.url);
         await fetch('/api/manage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -524,7 +552,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             momentId,
             adminPasswordHash: adminHash,
             action: 'SAVE_MEDIA_LIST',
-            payload: { media: newList }
+            payload: { media: finalizedOnly }
           })
         });
       }
@@ -587,6 +615,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     }
   };
 
+  const isUploading = Object.keys(uploadingFiles).length > 0;
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top Navigation */}
@@ -646,13 +676,13 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
 
           <button
             onClick={nextStep}
-            disabled={isSaving}
+            disabled={isSaving || isUploading}
             className="flex items-center justify-center bg-gradient-to-r from-rose-300 to-rose-500 text-zinc-950 rounded-2xl px-10 py-4 shadow-xl shadow-rose-500/20 hover:brightness-110 transition-all active:scale-[0.98] duration-150 disabled:opacity-70"
           >
             <span className="font-be-vietnam text-xs font-bold uppercase tracking-widest mr-2">
-              {isSaving ? "Đang xử lý..." : (step === 5 ? "Lưu và kích hoạt" : (step === 4 ? "Lưu lời nhắn" : "Tiếp theo"))}
+              {isSaving ? "Đang xử lý..." : isUploading ? "Đang tải lên..." : (step === 5 ? "Lưu và kích hoạt" : (step === 4 ? "Lưu lời nhắn" : "Tiếp theo"))}
             </span>
-            {isSaving ? (
+            {isSaving || isUploading ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
               step === 5 ? <Check size={18} /> : <ArrowRight size={18} />

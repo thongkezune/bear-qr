@@ -135,7 +135,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
     }
   }, [isMediaEnded]);
 
-  // 4. Background Music Manager (Nhạc nền riệng cho từng Video/Ảnh)
+    // 4. Background Music Manager (Nhạc nền riệng cho từng Video/Ảnh)
   useEffect(() => {
     if (!bgAudioRef.current || !momentData?.playlist) return;
     
@@ -149,9 +149,11 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
     // 3. Media là Video và đang bị Pause hoặc End
     const isActuallyPaused = currentMedia?.type === 'video' && (isPaused || isMediaEnded);
     
-    if (shouldPlay && moodId !== 'none' && !isActuallyPaused) {
+    // CHỈ PHAT KHI CÓ MOOD VÀ MOOD ĐÓ TỒN TẠI TRONG DANH SÁCH (KHÔNG LẤY FALLBACK 'CHILL')
+    const moodData = AUDIO_MOODS.find((m: any) => m.id === moodId);
+
+    if (shouldPlay && moodId !== 'none' && moodData && !isActuallyPaused) {
       const volume = (currentMedia?.music_volume ?? 60) / 100;
-      const moodData = AUDIO_MOODS.find((m: any) => m.id === moodId) || AUDIO_MOODS[0];
       
       if (bgAudioRef.current.src !== moodData.audio) {
         bgAudioRef.current.src = moodData.audio;
@@ -293,6 +295,8 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                         key={`${currentMedia.id}-${replayKey}`}
                         src={currentMedia.url} 
                         autoPlay 
+                        playsInline
+                        webkit-playsinline="true"
                         className="w-full h-full object-cover" 
                         onEnded={handleMediaEnd} 
                         onPlay={() => setIsPaused(false)}
@@ -469,11 +473,11 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
             </div>
           </motion.div>
         )}
-        {/* Background Audio Player */}
-        {momentData?.mood && (
+        {/* Background Audio Player - CHỈ PHÁT KHI CÓ MOOD HỢP LỆ VÀ KHÔNG PHẢI 'NONE' */}
+        {momentData?.mood && momentData.mood !== 'none' && (
           <audio 
             ref={bgAudioRef}
-            src={AUDIO_MOODS.find((m: any) => m.id === momentData.mood.toLowerCase())?.audio || AUDIO_MOODS[0].audio}
+            src={AUDIO_MOODS.find((m: any) => m.id === momentData.mood.toLowerCase())?.audio}
             loop 
           />
         )}

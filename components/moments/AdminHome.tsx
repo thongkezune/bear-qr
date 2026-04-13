@@ -259,6 +259,8 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
                   src={previewItem.url} 
                   autoPlay 
                   controls 
+                  playsInline
+                  webkit-playsinline="true"
                   className="w-full h-full object-contain"
                 />
               ) : (

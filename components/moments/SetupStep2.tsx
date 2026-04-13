@@ -127,6 +127,9 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
                        <video 
                         src={item.url} 
                         poster={item.thumbnail_url}
+                        playsInline
+                        webkit-playsinline="true"
+                        muted
                         className="w-full h-full object-cover" 
                        />
                      ) : (

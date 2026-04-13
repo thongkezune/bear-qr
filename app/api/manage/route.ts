@@ -104,12 +104,20 @@ export async function POST(req: NextRequest) {
             if (delErr) throw delErr;
           }
 
-          // 6. Xử lý danh sách mới (Tách riêng Insert và Upsert)
+          // 6. Xử lý danh sách mới (Lọc bỏ rác và bảo vệ URL cũ)
           const newItems: any[] = [];
           const existingItems: any[] = [];
 
-          processedMedia.forEach((m: any, idx: number) => {
-            const row = {
+          for (let idx = 0; idx < processedMedia.length; idx++) {
+            const m = processedMedia[idx];
+            
+            // CHẶN: Không lưu những tệp không có URL và tệp rác (Placeholders)
+            if (!m.url || m.url === "" || m.storage_path?.startsWith('pending-')) {
+              console.log(`[API Manage] Skipping placeholder/invalid item: ${m.storage_path}`);
+              continue;
+            }
+
+            const row: any = {
               moment_id: moment.short_id,
               url: m.url,
               type: m.type,
@@ -118,12 +126,23 @@ export async function POST(req: NextRequest) {
               order_index: idx,
               title_memory: m.title_memory || ""
             };
+
             if (m.id) {
+              // BẢO VỆ: Nếu tệp cũ trong DB đã có URL mà tệp gửi lên lại trống (lỗi sync) thì giữ lại URL cũ
+              const original = dbMedia?.find((dbM: any) => dbM.id === m.id);
+              if (original && (!row.url || row.url === "") && original.url) {
+                row.url = original.url;
+              }
+              // Tương tự cho thumbnail
+              if (original && (!row.thumbnail_url || row.thumbnail_url === "") && original.thumbnail_url) {
+                row.thumbnail_url = original.thumbnail_url;
+              }
+
               existingItems.push({ ...row, id: m.id }); 
             } else {
               newItems.push(row); 
             }
-          });
+          }
 
           // Insert file mới
           if (newItems.length > 0) {
