@@ -452,7 +452,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     };
 
     // 3. Khởi chạy tất cả các tiến trình tải lên song song
-    files.forEach((file, i) => {
+    Array.from(files).forEach((file, i) => {
       uploadSingleFile(file, newPlaceholders[i].storage_path);
     });
     } catch (err: any) {
