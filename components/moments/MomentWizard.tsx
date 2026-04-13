@@ -315,15 +315,12 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     updateFormData({ media: updatedMedia });
 
     try {
-      // 3. Tiến hành Upload từng file
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const placeholderPath = newPlaceholders[i].storage_path;
-        
-        // Cập nhật tiến trình: Bắt đầu
-        setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 10 }));
+      // Hàm xử lý tải lên cho từng tệp riêng biệt
+      const uploadSingleFile = async (file: File, placeholderPath: string) => {
+      try {
+        setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 5 }));
 
-        // Lấy Signed URL từ Backend
+        // A. Lấy Signed URL
         const res = await fetch('/api/manage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -335,18 +332,18 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           })
         });
 
+        if (!res.ok) throw new Error("Không thể lấy URL tải lên");
         const { signedUrl, token, path: storagePath } = await res.json();
 
-        // Upload trực tiếp lên Supabase Storage với tiến trình thực tế
+        // B. Upload XHR (0-100%)
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', signedUrl);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         
-        // Theo dõi tiến trình upload thực tế
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
-            const percent = Math.round((event.loaded / event.total) * 90);
-            setUploadingFiles(prev => ({ ...prev, [placeholderPath]: percent }));
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setUploadingFiles(prev => ({ ...prev, [placeholderPath]: Math.min(percent, 99) }));
           }
         };
 
@@ -359,72 +356,27 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
         await uploadPromise;
         setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 100 }));
 
-        // Tạo public URL
         const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${storagePath}`;
         
-        // Tạo thumbnail nếu là video
-        let finalThumbnailUrl = "";
-        if (file.type.startsWith('video/')) {
-           try {
-              const thumbBlob = await generateVideoThumbnail(file);
-              const thumbFileName = `thumb_${Date.now()}.jpg`;
-              const thumbRes = await fetch('/api/manage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  momentId,
-                  adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
-                  action: 'GET_UPLOAD_SIGNED_URL',
-                  payload: { fileName: thumbFileName }
-                })
-              });
-              const { signedUrl: tUrl, token: tToken, path: tPath } = await thumbRes.json();
-              await fetch(tUrl, { method: 'PUT', body: thumbBlob, headers: { 'Authorization': `Bearer ${tToken}` } });
-              finalThumbnailUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${tPath}`;
-           } catch (e) { console.error("Thumbnail error:", e); }
-        }
-
-        // Cập nhật State: Thay thế placeholder bằng dữ liệu thực
-        // BẢO VỆ DỮ LIỆU: Dùng functional update để không làm mất title/content đang nhập
+        // C. Cập nhật State chính (Video/Ảnh đã hiện lên!)
         setFormData(prev => {
           const newMedia = [...prev.media];
           const idx = newMedia.findIndex((m: any) => m.storage_path === placeholderPath);
           if (idx !== -1) {
-            newMedia[idx] = {
-              ...newMedia[idx], 
-              url: publicUrl,
-              storage_path: storagePath,
-              thumbnail_url: finalThumbnailUrl,
-              isPlaceholder: false
-            };
+            newMedia[idx] = { ...newMedia[idx], url: publicUrl, storage_path: storagePath, isPlaceholder: false };
           }
           
-          // Tự động đồng bộ lên DB ngay sau khi một tệp hoàn tất cập nhật state
-          const syncDB = async (latestMedia: any[]) => {
-            try {
-              const adminHash = await hashPassword(prev.adminPassword || "admin123");
-              const syncRes = await fetch('/api/manage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  momentId,
-                  adminPasswordHash: adminHash,
-                  action: 'SAVE_MEDIA_LIST',
-                  payload: { media: latestMedia }
-                })
-              });
-              const result = await syncRes.json();
-              if (result.success && result.media) {
-                 setFormData(f => ({ ...f, media: result.media }));
-              }
-            } catch (err) { console.error("Auto Sync Error:", err); }
-          };
-          
-          syncDB(newMedia);
+          // Đồng bộ DB đồng thời
+          syncMediaList(newMedia);
           return { ...prev, media: newMedia };
         });
 
-        // Dọn dẹp tiến trình
+        // D. Xử lý Thumbnail ngầm (Nếu là Video)
+        if (file.type.startsWith('video/')) {
+          generateAndUploadThumbnail(file, storagePath);
+        }
+
+        // Dọn dẹp tiến trình UI sau 1s
         setTimeout(() => {
           setUploadingFiles(prev => {
             const next = { ...prev };
@@ -432,7 +384,77 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             return next;
           });
         }, 1000);
+
+      } catch (err: any) {
+        console.error(`Lỗi tải tệp ${file.name}:`, err);
+        setUploadingFiles(prev => {
+          const next = { ...prev };
+          delete next[placeholderPath];
+          return next;
+        });
       }
+    };
+
+    // Hàm tạo và upload thumbnail ngầm
+    const generateAndUploadThumbnail = async (file: File, videoStoragePath: string) => {
+      try {
+        const thumbBlob = await generateVideoThumbnail(file);
+        if (!thumbBlob) return;
+
+        const thumbFileName = `thumb_${Date.now()}.jpg`;
+        const res = await fetch('/api/manage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            momentId,
+            adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
+            action: 'GET_UPLOAD_SIGNED_URL',
+            payload: { fileName: thumbFileName }
+          })
+        });
+
+        const { signedUrl: tUrl, token: tToken, path: tPath } = await res.json();
+        await fetch(tUrl, { method: 'PUT', body: thumbBlob, headers: { 'Authorization': `Bearer ${tToken}` } });
+        const finalThumbnailUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${tPath}`;
+
+        // Cập nhật lại thumbnail vào state và DB
+        setFormData(prev => {
+          const newMedia = prev.media.map((m: any) => 
+            m.storage_path === videoStoragePath ? { ...m, thumbnail_url: finalThumbnailUrl } : m
+          );
+          syncMediaList(newMedia);
+          return { ...prev, media: newMedia };
+        });
+      } catch (e) {
+        console.error("Lỗi tạo ảnh thu nhỏ ngầm:", e);
+      }
+    };
+
+    // Hàm đồng bộ DB tách riêng
+    const syncMediaList = async (latestMedia: any[]) => {
+      try {
+        const adminHash = await hashPassword(formData.adminPassword || "admin123");
+        const syncRes = await fetch('/api/manage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            momentId,
+            adminPasswordHash: adminHash,
+            action: 'SAVE_MEDIA_LIST',
+            payload: { media: latestMedia }
+          })
+        });
+        const result = await syncRes.json();
+        if (result.success && result.media) {
+           setFormData(f => ({ ...f, media: result.media }));
+        }
+      } catch (err) { console.error("Sync DB Error:", err); }
+    };
+
+    // 3. Khởi chạy tất cả các tiến trình tải lên song song
+    files.forEach((file, i) => {
+      uploadSingleFile(file, newPlaceholders[i].storage_path);
+    });
     } catch (err: any) {
       console.error("Upload Error:", err);
       alert("Lỗi tải lên: " + (err.message || "Vui lòng thử lại"));

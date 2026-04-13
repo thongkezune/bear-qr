@@ -286,24 +286,31 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                 className="relative w-full h-full max-w-5xl aspect-video md:aspect-[16/9] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/5 bg-zinc-900/40 cursor-pointer group"
               >
                 <div className="absolute inset-0 flex items-center justify-center">
-                  {currentMedia?.type === "video" ? (
-                    <video 
-                      ref={videoRef}
-                      key={`${currentMedia.id}-${replayKey}`}
-                      src={currentMedia.url} 
-                      autoPlay 
-                      className="w-full h-full object-cover" 
-                      onEnded={handleMediaEnd} 
-                      onPlay={() => setIsPaused(false)}
-                      onPause={() => setIsPaused(true)}
-                    />
+                  {currentMedia?.url ? (
+                    currentMedia.type === "video" ? (
+                      <video 
+                        ref={videoRef}
+                        key={`${currentMedia.id}-${replayKey}`}
+                        src={currentMedia.url} 
+                        autoPlay 
+                        className="w-full h-full object-cover" 
+                        onEnded={handleMediaEnd} 
+                        onPlay={() => setIsPaused(false)}
+                        onPause={() => setIsPaused(true)}
+                      />
+                    ) : (
+                      <img 
+                        key={`${currentMedia.id}-${replayKey}`}
+                        src={currentMedia.url} 
+                        className="w-full h-full object-cover" 
+                        alt={momentData.title} 
+                      />
+                    )
                   ) : (
-                    <img 
-                      key={`${currentMedia?.id}-${replayKey}`}
-                      src={currentMedia?.url || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80"} 
-                      className="w-full h-full object-cover" 
-                      alt={momentData.title} 
-                    />
+                    <div className="flex flex-col items-center gap-4 text-zinc-500">
+                      <Loader2 className="animate-spin" />
+                      <span className="text-xs uppercase tracking-widest">Đang tải kỉ niệm...</span>
+                    </div>
                   )}
                 </div>
 
