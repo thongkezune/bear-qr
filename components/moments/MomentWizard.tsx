@@ -259,35 +259,53 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     }
   }, [step]);
 
-  // HÀM TRÍCH XUẤT ẢNH TỪ VIDEO
+  // HÀM TRÍCH XUẤT ẢNH TỪ VIDEO (Có Timeout và hỗ trợ Mobile)
   const generateVideoThumbnail = (file: File): Promise<Blob | null> => {
     return new Promise((resolve) => {
       const video = document.createElement("video");
       const canvas = document.createElement("canvas");
       const url = URL.createObjectURL(file);
+      
+      // Cơ chế an toàn: Nếu sau 5s không tạo được ảnh thì bỏ qua để không treo máy
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 5000);
 
-      video.src = url;
+      const cleanup = () => {
+        clearTimeout(timeout);
+        URL.revokeObjectURL(url);
+        if (video.parentNode) document.body.removeChild(video);
+      };
+
+      video.style.display = "none";
       video.muted = true;
       video.playsInline = true;
+      video.src = url;
+      document.body.appendChild(video);
 
-      video.onloadeddata = () => {
-        // Chụp tại giây đầu tiên
+      video.onloadedmetadata = () => {
         video.currentTime = 1;
       };
 
       video.onseeked = () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => {
-          URL.revokeObjectURL(url);
-          resolve(blob);
-        }, "image/jpeg", 0.7);
+        try {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            cleanup();
+            resolve(blob);
+          }, "image/jpeg", 0.7);
+        } catch (e) {
+          cleanup();
+          resolve(null);
+        }
       };
 
       video.onerror = () => {
-        URL.revokeObjectURL(url);
+        cleanup();
         resolve(null);
       };
     });
@@ -297,9 +315,10 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
   const handleGlobalUpload = async (files: FileList) => {
     if (!momentId) return;
 
-    // 1. Ghi nhớ vị trí bắt đầu để tự động chuyển bước sau này
-    const currentLength = formData.media?.length || 0;
-    uploadStartIndex.current = currentLength;
+    try {
+      // 1. Ghi nhớ vị trí bắt đầu để tự động chuyển bước sau này
+      const currentLength = formData.media?.length || 0;
+      uploadStartIndex.current = currentLength;
 
     // 2. Tạo Placeholder ngay lập tức để SetupStep3 nhận diện được
     const newPlaceholders = Array.from(files).map((file, i) => ({
@@ -314,84 +333,93 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     const updatedMedia = [...(formData.media || []), ...newPlaceholders];
     updateFormData({ media: updatedMedia });
 
-    try {
-      // Hàm xử lý tải lên cho từng tệp riêng biệt
-      const uploadSingleFile = async (file: File, placeholderPath: string) => {
-      try {
-        setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 5 }));
-
-        // A. Lấy Signed URL
-        const res = await fetch('/api/manage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            momentId,
-            adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
-            action: 'GET_UPLOAD_SIGNED_URL',
-            payload: { fileName: `${Date.now()}_${file.name}` }
-          })
-        });
-
-        if (!res.ok) throw new Error("Không thể lấy URL tải lên");
-        const { signedUrl, token, path: storagePath } = await res.json();
-
-        // B. Upload XHR (0-100%)
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', signedUrl);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    // 3. Tiến trình tải lên Tuần tự (Sequential) để ổn định trên Mobile
+    const runSequentialUpload = async () => {
+      const fileArray = Array.from(files);
+      
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        const placeholderPath = newPlaceholders[i].storage_path;
         
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percent = Math.round((event.loaded / event.total) * 100);
-            setUploadingFiles(prev => ({ ...prev, [placeholderPath]: Math.min(percent, 99) }));
-          }
-        };
+        try {
+          setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 5 }));
 
-        const uploadPromise = new Promise((resolve, reject) => {
-          xhr.onload = () => xhr.status === 200 ? resolve(true) : reject();
-          xhr.onerror = () => reject();
-          xhr.send(file);
-        });
+          // A. Lấy Signed URL
+          const res = await fetch('/api/manage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              momentId,
+              adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
+              action: 'GET_UPLOAD_SIGNED_URL',
+              payload: { fileName: `${Date.now()}_${file.name}` }
+            })
+          });
 
-        await uploadPromise;
-        setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 100 }));
+          if (!res.ok) throw new Error("Không thể lấy URL tải lên");
+          const { signedUrl, token, path: storagePath } = await res.json();
 
-        const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${storagePath}`;
-        
-        // C. Cập nhật State chính (Video/Ảnh đã hiện lên!)
-        setFormData(prev => {
-          const newMedia = [...prev.media];
-          const idx = newMedia.findIndex((m: any) => m.storage_path === placeholderPath);
-          if (idx !== -1) {
-            newMedia[idx] = { ...newMedia[idx], url: publicUrl, storage_path: storagePath, isPlaceholder: false };
-          }
+          // B. Upload XHR (0-100%)
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', signedUrl);
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
           
-          // Đồng bộ DB đồng thời
-          syncMediaList(newMedia);
-          return { ...prev, media: newMedia };
-        });
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              setUploadingFiles(prev => ({ ...prev, [placeholderPath]: Math.min(percent, 99) }));
+            }
+          };
 
-        // D. Xử lý Thumbnail ngầm (Nếu là Video)
-        if (file.type.startsWith('video/')) {
-          generateAndUploadThumbnail(file, storagePath);
-        }
+          const uploadPromise = new Promise((resolve, reject) => {
+            xhr.onload = () => xhr.status === 200 ? resolve(true) : reject();
+            xhr.onerror = () => reject();
+            xhr.send(file);
+          });
 
-        // Dọn dẹp tiến trình UI sau 1s
-        setTimeout(() => {
+          await uploadPromise;
+          setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 100 }));
+
+          const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${storagePath}`;
+          
+          // C. Cập nhật State & DB (Không lỗi Race Condition)
+          let latestMediaState: any[] = [];
+          
+          setFormData(prev => {
+            const newMedia = prev.media.map((m: any) => 
+              m.storage_path === placeholderPath 
+                ? { ...m, url: publicUrl, storage_path: storagePath, isPlaceholder: false } 
+                : m
+            );
+            latestMediaState = newMedia;
+            return { ...prev, media: newMedia };
+          });
+
+          // Gọi Sync DB sau khi đã mượn được state mới nhất
+          await syncMediaList(latestMediaState);
+
+          // D. Xử lý Thumbnail (Không chặn tiến trình chính)
+          if (file.type.startsWith('video/')) {
+            generateAndUploadThumbnail(file, storagePath);
+          }
+
+          // Dọn dẹp tiến trình UI sau 1s
+          setTimeout(() => {
+            setUploadingFiles(prev => {
+              const next = { ...prev };
+              delete next[placeholderPath];
+              return next;
+            });
+          }, 1000);
+
+        } catch (err: any) {
+          console.error(`Lỗi tải tệp ${file.name}:`, err);
           setUploadingFiles(prev => {
             const next = { ...prev };
             delete next[placeholderPath];
             return next;
           });
-        }, 1000);
-
-      } catch (err: any) {
-        console.error(`Lỗi tải tệp ${file.name}:`, err);
-        setUploadingFiles(prev => {
-          const next = { ...prev };
-          delete next[placeholderPath];
-          return next;
-        });
+        }
       }
     };
 
@@ -451,10 +479,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       } catch (err) { console.error("Sync DB Error:", err); }
     };
 
-    // 3. Khởi chạy tất cả các tiến trình tải lên song song
-    Array.from(files).forEach((file, i) => {
-      uploadSingleFile(file, newPlaceholders[i].storage_path);
-    });
+    runSequentialUpload();
     } catch (err: any) {
       console.error("Upload Error:", err);
       alert("Lỗi tải lên: " + (err.message || "Vui lòng thử lại"));
