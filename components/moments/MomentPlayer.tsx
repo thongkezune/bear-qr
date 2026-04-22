@@ -329,9 +329,31 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
               <div className="relative w-full max-w-5xl">
                 <div 
                   onClick={() => setIsMediaEnded(!isMediaEnded)}
-                  className="relative w-full aspect-video md:aspect-[16/9] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/5 bg-zinc-900/40 cursor-pointer group"
+                  className="relative w-full min-h-[400px] max-h-[85vh] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/5 bg-zinc-900/40 cursor-pointer group flex items-center justify-center"
                 >
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  {/* Backdrop Ambient Layer (Netflix/YouTube Style) */}
+                  {currentMedia?.thumbnail_url && (
+                    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                      <motion.img 
+                        initial={{ scale: 1.1, opacity: 0 }}
+                        animate={{ 
+                          scale: [1.1, 1.18, 1.1],
+                          opacity: 0.45
+                        }}
+                        transition={{ 
+                          opacity: { duration: 1 },
+                          scale: { duration: 20, repeat: Infinity, ease: "linear" }
+                        }}
+                        src={currentMedia.thumbnail_url} 
+                        alt="Ambient Background" 
+                        className="w-full h-full object-cover blur-[100px] saturate-[1.8]"
+                      />
+                      {/* Contrast Guard Overlay */}
+                      <div className="absolute inset-0 bg-zinc-950/40 backdrop-brightness-75" />
+                    </div>
+                  )}
+
+                  <div className="relative z-10 w-full h-full flex items-center justify-center">
                     {currentMedia?.url ? (
                       currentMedia.type === "video" ? (
                         <video 
@@ -341,7 +363,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                           autoPlay 
                           playsInline
                           webkit-playsinline="true"
-                          className="w-full h-full object-cover" 
+                          className="max-w-full max-h-[85vh] object-contain" 
                           onEnded={handleMediaEnd} 
                           onPlay={() => setIsPaused(false)}
                           onPause={() => setIsPaused(true)}
@@ -350,7 +372,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                         <img 
                           key={`${currentMedia.id}-${replayKey}`}
                           src={currentMedia.url} 
-                          className="w-full h-full object-cover" 
+                          className="max-w-full max-h-[85vh] object-contain" 
                           alt={momentData.title} 
                         />
                       )
@@ -423,7 +445,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                   </AnimatePresence>
 
 
-                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 pt-20 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 pt-20 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-30">
                     <div className="flex justify-between items-end mb-3">
                       <div className="space-y-1.5 flex-1">
                         <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400/80">Nội dung {currentMediaIndex + 1} / {momentData?.playlist?.length || 1}</span>
