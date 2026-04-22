@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Edit3, User, MessageCircle, Sparkles, Image as ImageIcon, Video as VideoIcon, History } from "lucide-react";
 
@@ -14,6 +15,11 @@ interface SetupStep3Props {
 export const SetupStep3 = ({ formData, updateFormData, editingIndex, uploadingFiles = {} }: SetupStep3Props) => {
   const mediaItem = formData.media[editingIndex];
   const progress = mediaItem?.storage_path ? uploadingFiles[mediaItem.storage_path] : null;
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   if (!mediaItem) {
     return (
@@ -86,14 +92,10 @@ export const SetupStep3 = ({ formData, updateFormData, editingIndex, uploadingFi
             )}
           </>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/40 via-transparent to-transparent opacity-60 pointer-events-none" />
         <div className="absolute bottom-6 left-6 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/10">
+          <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/10 shadow-lg">
             {mediaItem.type === 'video' ? <VideoIcon size={18} /> : <ImageIcon size={18} />}
-          </div>
-          <div className="text-left">
-              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Đang chỉnh sửa</p>
-              <p className="text-white text-xs font-medium opacity-60">Thứ tự: {editingIndex + 1}</p>
           </div>
         </div>
       </section>
@@ -174,7 +176,7 @@ export const SetupStep3 = ({ formData, updateFormData, editingIndex, uploadingFi
                         </div>
                         <span className="text-xs font-bold text-rose-200">{msg.author}</span>
                       </div>
-                      <span className="text-[9px] font-mono text-zinc-600">{new Date(msg.created_at).toLocaleDateString('vi-VN')}</span>
+                      <span className="text-[9px] font-mono text-zinc-600">{isMounted && new Date(msg.created_at).toLocaleDateString('vi-VN')}</span>
                    </div>
                    <p className="text-zinc-400 text-sm italic font-light leading-relaxed">"{msg.content}"</p>
                 </motion.div>

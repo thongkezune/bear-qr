@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, User, MessageCircle, Heart, Share2, History, Sparkles, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,12 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
   const [newAuthor, setNewAuthor] = useState('');
   const [newContent, setNewContent] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -126,7 +132,7 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
                       <h3 className="text-rose-200 font-bold text-sm tracking-wide">{comment.author}</h3>
                     </div>
                     <span className="text-zinc-600 font-mono text-[10px] tabular-nums">
-                      {new Date(comment.created_at).toLocaleDateString('vi-VN')}
+                      {isMounted && new Date(comment.created_at).toLocaleDateString('vi-VN')}
                     </span>
                   </div>
                   <p className="text-zinc-300 text-sm leading-relaxed font-light italic">
@@ -158,7 +164,7 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
         )}
 
         {/* Input Form */}
-        <div className="mt-12 pt-12 border-t border-white/5 space-y-8">
+        <div ref={formRef} className="mt-12 pt-12 border-t border-white/5 space-y-8 pb-10">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
                 <Sparkles size={18} />
@@ -176,6 +182,9 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
                   type="text" 
                   value={newAuthor}
                   onChange={(e) => setNewAuthor(e.target.value)}
+                  onFocus={() => {
+                    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                  }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 font-be-vietnam-pro"
                   placeholder="Gấu con, Anh xã, ..."
                 />
@@ -185,6 +194,9 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
                 <textarea 
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
+                  onFocus={() => {
+                    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                  }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 resize-none font-be-vietnam-pro"
                   placeholder="Viết điều gì đó thật ngọt ngào..."
                   rows={4}

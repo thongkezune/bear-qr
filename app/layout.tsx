@@ -14,12 +14,12 @@ const beVietnam = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "BearQR - Lưu giữ khoảnh khắc, trao gửi yêu thương",
-  description: "Trải nghiệm quà tặng gấu bông số hóa độc đáo nhất. Gắn kết yêu thương qua từng mã QR định danh.",
-  keywords: "gấu bông, quà tặng, nhãn QR, bearqr, kỷ niệm, quà tặng số",
+  title: "Omemo - Ôm trọn từng ký ức",
+  description: "Trải nghiệm quà tặng kỉ niệm số hóa độc đáo nhất. Gắn kết yêu thương qua từng mã định danh Omemo.",
+  keywords: "gấu bông, quà tặng, nhãn QR, omemo, kỷ niệm, quà tặng số",
   openGraph: {
-    title: "BearQR - Lưu giữ khoảnh khắc",
-    description: "Quà tặng gấu bông tích hợp mã QR lưu trữ video/hình ảnh.",
+    title: "Omemo - Lưu giữ khoảnh khắc",
+    description: "Quà tặng tích hợp mã lưu trữ video/hình ảnh Omemo.",
     type: "website",
     locale: "vi_VN",
   },

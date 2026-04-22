@@ -30,7 +30,6 @@ export default function PasswordGate({ onUnlock, onAdminLogin, viewerHint, hashe
       onUnlock(password);
     } else {
       setError(true);
-      setTimeout(() => setError(false), 500);
     }
   };
 
@@ -91,8 +90,11 @@ export default function PasswordGate({ onUnlock, onAdminLogin, viewerHint, hashe
             <input 
               type={showPassword ? "text" : "password"}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white/5 border-none ring-1 ring-zinc-800 focus:ring-rose-500/50 rounded-xl py-4 pl-12 pr-12 text-white placeholder:text-zinc-600 font-be-vietnam-pro transition-all duration-300 backdrop-blur-md"
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError(false);
+              }}
+              className={`w-full bg-white/5 border-none ring-1 ${error ? 'ring-rose-500' : 'ring-zinc-800'} focus:ring-rose-500/50 rounded-xl py-4 pl-12 pr-12 text-white placeholder:text-zinc-600 font-be-vietnam-pro transition-all duration-300 backdrop-blur-md`}
               placeholder="Nhập mật khẩu truy cập"
               onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
             />
@@ -103,6 +105,23 @@ export default function PasswordGate({ onUnlock, onAdminLogin, viewerHint, hashe
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
           </div>
+
+          {/* Error Message */}
+          <AnimatePresence>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-center gap-2 px-1 py-1"
+              >
+                <div className="w-1 h-1 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-[11px] font-bold text-rose-500 uppercase tracking-wider">
+                  Mật khẩu không chính xác. Vui lòng thử lại.
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Viewer Hint Toggle */}
           {viewerHint && (
@@ -155,7 +174,7 @@ export default function PasswordGate({ onUnlock, onAdminLogin, viewerHint, hashe
       {/* Footer Aesthetic */}
       <footer className="mt-20 w-full text-center px-6 z-10 pointer-events-none opacity-40">
         <p className="text-[10px] font-medium text-zinc-500 tracking-[0.2em] uppercase">
-          Mã hóa đầu cuối • Bảo mật bởi BearQR
+          Mã hóa đầu cuối • Bảo mật bởi Omemo
         </p>
       </footer>
     </motion.div>

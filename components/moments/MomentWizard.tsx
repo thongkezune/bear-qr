@@ -24,6 +24,9 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
   const [step, setStep] = useState(initialStep);
   const totalSteps = 6;
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  
+  // Ref để lưu trữ tệp tin phục vụ việc Retry (vì File object không thể lưu vào State dễ dàng)
+  const filesMapRef = useRef<{[key: string]: File}>({});
   const [formData, setFormData] = useState({
     adminPassword: adminPassword,
     adminHint: "",
@@ -39,25 +42,56 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       admin_author?: string; 
       admin_content?: string; 
       storage_path?: string;
-      thumbnail_url?: string; // Thêm trường ảnh đại diện
+      thumbnail_url?: string;
       isPlaceholder?: boolean; 
     }[],
   });
 
+  const MAX_STORAGE_MB = 100; // Giới hạn cứng 100MB theo yêu cầu
+  const [comeFromStep, setComeFromStep] = useState<number>(2);
+  const [sessionMediaStartIndex, setSessionMediaStartIndex] = useState<number | null>(null);
+
   const [uploadingFiles, setUploadingFiles] = useState<{[key: string]: number}>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<{ usedMB: number, totalMB: number } | null>(null);
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
-  const [isSaving, setIsSaving] = useState(false);
+  const fetchStorageUsage = async () => {
+    if (!momentId) return;
+    try {
+      const adminHash = await hashPassword(formData.adminPassword || "admin123");
+      
+      // THỰC HIỆN DỌN DẸP NGẦM TRƯỚC KHI TÍNH DUNG LƯỢNG
+      await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'CLEANUP_ORPHANED_MEDIA' })
+      });
 
-  // 1. Nạp dữ liệu cũ (Hydrate) khi vào trang Admin
+      const res = await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'GET_STORAGE_USAGE' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStorageInfo({ 
+          usedMB: Number((data.totalUsedBytes / (1024 * 1024)).toFixed(1)), 
+          totalMB: MAX_STORAGE_MB 
+        });
+      }
+    } catch (e) {
+      console.error("Lỗi lấy dung lượng:", e);
+    }
+  };
+
   useEffect(() => {
     const hydrateData = async () => {
       if (!momentId) return;
-      
-      console.log(`[MomentWizard] Hydrating data for: ${momentId}`);
       try {
         const { data: moment, error: mError } = await supabase
           .from('moments')
@@ -67,18 +101,14 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           .maybeSingle();
 
         if (mError) throw mError;
-
         if (moment) {
-          // Sắp xếp media theo index và lấy danh sách tin nhắn
           const sortedMedia = (moment.media || []).sort((a: any, b: any) => a.order_index - b.order_index).map((m: any) => {
-            // Lấy tin nhắn cuối cùng (mới nhất) làm mặc định cho ô nhập
             const lastMsg = m.messages && m.messages.length > 0 
               ? [...m.messages].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
               : null;
-              
             return {
               ...m,
-              messages: m.messages || [], // Giữ lại toàn bộ để hiện lịch sử
+              messages: m.messages || [],
               admin_author: m.admin_author || lastMsg?.author || "",
               admin_content: m.admin_content || lastMsg?.content || ""
             };
@@ -92,24 +122,20 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             viewerHint: moment.viewer_hint || prev.viewerHint || "",
             media: sortedMedia,
           }));
-          console.log(`[MomentWizard] Successfully loaded ${sortedMedia.length} media items.`);
+          fetchStorageUsage();
         }
       } catch (err) {
         console.error("[MomentWizard] Hydration failed:", err);
       }
     };
-
     hydrateData();
   }, [momentId, adminPassword]);
 
   const handleFinalSave = async () => {
     if (!momentId) return;
-    
     setIsSaving(true);
     try {
       const adminHash = await hashPassword(formData.adminPassword || "admin123");
-      
-      // 1. Kích hoạt và cập nhật thông tin cơ bản
       const resMeta = await fetch('/api/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,19 +149,13 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             viewer_hint: formData.isPrivate ? formData.viewerHint : null,
             is_private: formData.isPrivate,
             title: formData.title || "Kỉ niệm của tôi",
-            mood: 'none' // Ép buộc không có nhạc nền mặc định
+            mood: 'none'
           }
         })
       });
-
-      if (!resMeta.ok) {
-        const errData = await resMeta.json();
-        throw new Error(errData.error || 'Cập nhật thất bại.');
-      }
-
-      // 2. Lưu danh sách media (Playlist)
+      if (!resMeta.ok) throw new Error('Cập nhật thất bại.');
       if (formData.media && formData.media.length > 0) {
-        const resMedia = await fetch('/api/manage', {
+        await fetch('/api/manage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -145,15 +165,10 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             payload: { media: formData.media }
           })
         });
-        if (!resMedia.ok) {
-          const errData = await resMedia.json();
-          throw new Error(errData.error || 'Không thể lưu danh sách media.');
-        }
       }
-      
+      setSessionMediaStartIndex(null);
       setStep(6);
     } catch (err: any) {
-      console.error("Error activating moment:", err);
       alert("Có lỗi xảy ra: " + (err.message || "Vui lòng thử lại."));
     } finally {
       setIsSaving(false);
@@ -180,11 +195,9 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           }
         })
       });
-
       if (!resMeta.ok) throw new Error('Cập nhật thất bại.');
       updateFormData(newSettings);
     } catch (err: any) {
-      console.error("[Settings] Error:", err);
       alert("Không thể lưu cài đặt: " + err.message);
       throw err;
     }
@@ -192,12 +205,10 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
 
   const nextStep = async () => {
     if (step === 1) {
-      if (!formData.adminPassword || formData.adminPassword.length < 1) {
-        alert("Vui lòng thiết lập mật khẩu quản lý (tối thiểu 1 ký tự) trước khi tiếp tục!");
+      if (!formData.adminPassword) {
+        alert("Vui lòng thiết lập mật khẩu quản lý!");
         return;
       }
-
-      // TỰ ĐỘNG LƯU MẬT KHẨU VÀ KÍCH HOẠT NGAY BƯỚC 1
       setIsSaving(true);
       try {
         const adminHash = await hashPassword(formData.adminPassword);
@@ -208,496 +219,425 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             momentId,
             adminPasswordHash: adminHash,
             action: 'ACTIVATE_OR_UPDATE',
-            payload: {
-              admin_hint: formData.adminHint,
-              is_activated: true,
-              title: "Kỉ niệm của tôi"
-            }
+            payload: { admin_hint: formData.adminHint, is_activated: true, title: "Kỉ niệm của tôi" }
           })
         });
-        
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Không thể khởi tạo Gấu.");
-        }
-        
+        if (!res.ok) throw new Error("Không thể khởi tạo Gấu.");
         setStep(2);
       } catch (err: any) {
         alert(err.message);
-        return;
       } finally {
         setIsSaving(false);
       }
       return;
     }
-
-    if (step === 5) {
-      handleFinalSave();
-    } else if (step === 3) {
-      // Nếu có ảnh mới tải lên, bắt đầu chỉnh sửa từ ảnh mới đầu tiên
-      if (formData.media && formData.media.length > uploadStartIndex.current) {
-        setEditingIndex(uploadStartIndex.current);
+    if (step === 5) handleFinalSave();
+    else if (step === 3) {
+      if (formData.media.length > 0) {
+        setEditingIndex(sessionMediaStartIndex !== null ? sessionMediaStartIndex : 0);
         setStep(4);
       } else {
-        // Nếu không có ảnh mới, có thể sang bước cài đặt hoặc giữ nguyên
-        setStep(step + 1);
+        setStep(5);
       }
-    } else if (step < totalSteps) {
-      setStep(step + 1);
     }
+    else if (step === 4) {
+      if (editingIndex !== null && editingIndex < formData.media.length - 1) {
+        setEditingIndex(editingIndex + 1);
+      } else {
+        setStep(5);
+      }
+    }
+    else if (step < totalSteps) setStep(step + 1);
   };
 
   const prevStep = () => {
-    if (step === 4) setStep(2); // Quay về trang chủ khi hủy bỏ chỉnh sửa
+    if (step === 4) {
+      if (comeFromStep === 2) {
+        setStep(2);
+      } else {
+        const startIndex = sessionMediaStartIndex !== null ? sessionMediaStartIndex : 0;
+        if (editingIndex !== null && editingIndex > startIndex) {
+          setEditingIndex(editingIndex - 1);
+        } else {
+          setStep(3);
+        }
+      }
+    }
+    else if (step === 5) {
+      if (formData.media.length > 0) {
+        setEditingIndex(formData.media.length - 1);
+        setStep(4);
+      } else {
+        setStep(3);
+      }
+    }
     else if (step > 1) setStep(step - 1);
   };
 
-  // Ghi nhớ vị trí bắt đầu của các ảnh mới tải lên trong phiên này
-  const uploadStartIndex = useRef<number>(0);
-  useEffect(() => {
-    if (step === 3) {
-      uploadStartIndex.current = formData.media?.length || 0;
-    }
-  }, [step]);
-
-  // HÀM TRÍCH XUẤT ẢNH TỪ VIDEO (Có Timeout và hỗ trợ Mobile)
   const generateVideoThumbnail = (file: File): Promise<Blob | null> => {
     return new Promise((resolve) => {
       const video = document.createElement("video");
       const canvas = document.createElement("canvas");
       const url = URL.createObjectURL(file);
-      
-      // Cơ chế an toàn: Nếu sau 5s không tạo được ảnh thì bỏ qua để không treo máy
-      const timeout = setTimeout(() => {
-        cleanup();
-        resolve(null);
-      }, 5000);
-
+      const timeout = setTimeout(() => { cleanup(); resolve(null); }, 5000);
       const cleanup = () => {
         clearTimeout(timeout);
         URL.revokeObjectURL(url);
         if (video.parentNode) document.body.removeChild(video);
       };
-
       video.style.display = "none";
       video.muted = true;
       video.playsInline = true;
       video.src = url;
       document.body.appendChild(video);
-
-      video.onloadedmetadata = () => {
-        video.currentTime = 1;
+      video.onloadedmetadata = () => { 
+        // Lấy frame ở giây thứ 1 để tránh màn hình đen ở giây 0
+        video.currentTime = Math.min(1, video.duration || 1); 
       };
-
       video.onseeked = () => {
         try {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => {
-            cleanup();
-            resolve(blob);
-          }, "image/jpeg", 0.7);
-        } catch (e) {
-          cleanup();
-          resolve(null);
-        }
+          canvas.toBlob((blob) => { cleanup(); resolve(blob); }, "image/jpeg", 0.7);
+        } catch { cleanup(); resolve(null); }
       };
-
-      video.onerror = () => {
-        cleanup();
-        resolve(null);
-      };
+      video.onerror = () => { cleanup(); resolve(null); };
     });
   };
 
-  // HÀM TẢI LÊN TOÀN CỤC (Background Upload)
-  const handleGlobalUpload = async (files: FileList) => {
-    if (!momentId) return;
-
+  // HÀM TẢI LÊN ĐƠN LẺ (Đưa ra ngoài để dùng chung cho Retry)
+  const uploadSingleFile = async (file: File, pPath: string, index: number, adminHash: string) => {
     try {
-      // 1. Ghi nhớ vị trí bắt đầu để tự động chuyển bước sau này
-      const currentLength = formData.media?.length || 0;
-      uploadStartIndex.current = currentLength;
+      setUploadingFiles(prev => ({ ...prev, [pPath]: 1 }));
 
-    // 2. Tạo Placeholder ngay lập tức để SetupStep3 nhận diện được
-    const newPlaceholders = Array.from(files).map((file, i) => ({
-      url: "", // Trống vì chưa có URL
-      type: file.type.startsWith('video') ? 'video' : 'image',
-      storage_path: `pending-${Date.now()}-${i}`,
-      name: file.name,
-      title_memory: "",
-      mood: "none",
-      isPlaceholder: true
-    }));
-
-    const updatedMedia = [...(formData.media || []), ...newPlaceholders];
-    updateFormData({ media: updatedMedia });
-
-    // 3. Tiến trình tải lên Tuần tự (Sequential) để ổn định trên Mobile
-    const runSequentialUpload = async () => {
-      const fileArray = Array.from(files);
-      // Khởi tạo danh sách tạm thời dựa trên placeholders đã tạo
-      let currentMediaItems = [...updatedMedia];
+      // A. Lấy Signed URL
+      const res = await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          momentId, 
+          adminPasswordHash: adminHash, 
+          action: 'GET_UPLOAD_SIGNED_URL', 
+          payload: { fileName: `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}` } 
+        })
+      });
       
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
-        const placeholderPath = newPlaceholders[i].storage_path;
-        
-        try {
-          setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 5 }));
+      if (!res.ok) throw new Error(`Lỗi khởi tạo Storage (${res.status})`);
+      const { signedUrl, path: sPath } = await res.json();
 
-          // Xử lý tên tệp: Xóa bỏ khoảng trắng và ký tự đặc biệt (Rất hay lỗi trên iPhone/Android)
-          const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-
-          // A. Lấy Signed URL
-          const res = await fetch('/api/manage', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              momentId,
-              adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
-              action: 'GET_UPLOAD_SIGNED_URL',
-              payload: { fileName: `${Date.now()}_${safeName}` }
-            })
-          });
-
-          if (!res.ok) throw new Error("Không thể lấy URL tải lên");
-          const { signedUrl, token, path: storagePath } = await res.json();
-
-          // B. Upload XHR (0-100%)
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', signedUrl);
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          
-          // QUAN TRỌNG: Bắt buộc khai báo định dạng (MIME Type) để Supabase không chặn các định dạng như .MOV của iPhone
-          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-          
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const percent = Math.round((event.loaded / event.total) * 100);
-              setUploadingFiles(prev => ({ ...prev, [placeholderPath]: Math.min(percent, 99) }));
-            }
-          };
-
-          const uploadPromise = new Promise((resolve, reject) => {
-            xhr.onload = () => xhr.status === 200 ? resolve(true) : reject();
-            xhr.onerror = () => reject();
-            xhr.send(file);
-          });
-
-          await uploadPromise;
-          setUploadingFiles(prev => ({ ...prev, [placeholderPath]: 100 }));
-
-          const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${storagePath}`;
-          
-          // C. Cập nhật Danh sách cục bộ & State & DB
-          currentMediaItems = currentMediaItems.map((m: any) => 
-            m.storage_path === placeholderPath 
-              ? { ...m, url: publicUrl, storage_path: storagePath, isPlaceholder: false } 
-              : m
-          );
-
-          // Cập nhật UI
-          setFormData(prev => ({ ...prev, media: currentMediaItems }));
-
-          // Lưu vào Database (Đảm bảo có URL mới nhất)
-          await syncMediaList(currentMediaItems);
-
-          // D. Xử lý Thumbnail (Nếu là Video) - Chạy ngầm, không đợi
-          if (file.type.startsWith('video/')) {
-            generateAndUploadThumbnail(file, storagePath);
+      // B. Upload bằng XHR (để lấy progress)
+      const xhr = new XMLHttpRequest();
+      const uploadResult = await new Promise((resolve, reject) => {
+        xhr.open('PUT', signedUrl);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            setUploadingFiles(prev => ({ ...prev, [pPath]: Math.max(percent, 1) }));
           }
+        };
+        xhr.onload = () => (xhr.status === 200 || xhr.status === 201) ? resolve(true) : reject(new Error(`Server Error ${xhr.status}`));
+        xhr.onerror = () => reject(new Error("Lỗi kết nối mạng"));
+        xhr.timeout = 180000; // 3 phút cho video lớn
+        xhr.ontimeout = () => reject(new Error("Quá thời gian tải lên"));
+        xhr.send(file);
+      });
 
-          // Dọn dẹp tiến trình UI sau 1s
-          setTimeout(() => {
-            setUploadingFiles(prev => {
-              const next = { ...prev };
-              delete next[placeholderPath];
-              return next;
-            });
-          }, 1000);
-
-        } catch (err: any) {
-          console.error(`Lỗi tải tệp ${file.name}:`, err);
-          setUploadingFiles(prev => {
-            const next = { ...prev };
-            delete next[placeholderPath];
-            return next;
-          });
-        }
-      }
-    };
-
-    // Hàm tạo và upload thumbnail ngầm
-    const generateAndUploadThumbnail = async (file: File, videoStoragePath: string) => {
-      try {
-        const thumbBlob = await generateVideoThumbnail(file);
-        if (!thumbBlob) return;
-
-        const thumbFileName = `thumb_${Date.now()}.jpg`;
-        const res = await fetch('/api/manage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            momentId,
-            adminPasswordHash: await hashPassword(formData.adminPassword || "admin123"),
-            action: 'GET_UPLOAD_SIGNED_URL',
-            payload: { fileName: thumbFileName }
-          })
-        });
-
-        const { signedUrl: tUrl, token: tToken, path: tPath } = await res.json();
-        await fetch(tUrl, { method: 'PUT', body: thumbBlob, headers: { 'Authorization': `Bearer ${tToken}` } });
-        const finalThumbnailUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${tPath}`;
-
-        // Cập nhật lại thumbnail vào state và DB
-        setFormData(prev => {
-          const newMedia = prev.media.map((m: any) => 
-            m.storage_path === videoStoragePath ? { ...m, thumbnail_url: finalThumbnailUrl } : m
-          );
-          syncMediaList(newMedia);
-          return { ...prev, media: newMedia };
-        });
-      } catch (e) {
-        console.error("Lỗi tạo ảnh thu nhỏ ngầm:", e);
-      }
-    };
-
-    // Hàm đồng bộ DB tách riêng (Có cơ chế Merge để tránh reset tiến trình)
-    const syncMediaList = async (latestMedia: any[]) => {
-      // CHẶN: Không bao giờ gửi khung chờ (placeholder) lên Database
-      const finalizedOnly = latestMedia.filter((m: any) => !m.isPlaceholder && m.url && m.url !== "");
+      // C. Sau khi tải Storage thành công -> Cập nhật URL và Sync DB TỨC THÌ
+      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${sPath}`;
+      const currentType = file.type.startsWith('image') ? 'image' : 'video';
       
-      if (finalizedOnly.length === 0 && latestMedia.length > 0) {
-        console.log("[MomentWizard] Nothing finalized yet, skipping sync.");
-        return;
+      const syncRes = await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          momentId,
+          adminPasswordHash: adminHash,
+          action: 'SYNC_SINGLE_MEDIA',
+          payload: { 
+            item: {
+              url: publicUrl,
+              type: currentType,
+              storage_path: sPath,
+              order_index: (formData.media?.length || 0) + index
+            }
+          }
+        })
+      });
+
+      if (!syncRes.ok) console.warn("[Sync] Không thể đồng bộ database ngay lập tức cho:", file.name);
+      const syncData = await syncRes.json();
+      const finalItem = syncData.item || { url: publicUrl, storage_path: sPath, type: currentType };
+
+      // D. Cập nhật UI State
+      setFormData(prev => ({
+        ...prev,
+        media: prev.media.map((m: any) => 
+          m.storage_path === pPath 
+            ? { ...m, ...finalItem, isPlaceholder: false } 
+            : m
+        )
+      }));
+
+      // E. Xử lý Thumbnail Video (Ngầm)
+      if (currentType === 'video') {
+        generateAndUploadThumbnail(file, sPath, adminHash);
       }
 
-      try {
-        const adminHash = await hashPassword(formData.adminPassword || "admin123");
-        const syncRes = await fetch('/api/manage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            momentId,
-            adminPasswordHash: adminHash,
-            action: 'SAVE_MEDIA_LIST',
-            payload: { media: finalizedOnly }
-          })
-        });
-        const result = await syncRes.json();
-        
-        if (result.success && result.media) {
-           // CHIẾN THUẬT MERGE: 
-           // Giữ lại tất cả các placeholders đang tải ở Client mà Server chưa biết
-           setFormData(f => {
-             const serverMedia = result.media;
-             const localPlaceholders = f.media.filter((m: any) => m.isPlaceholder);
-             
-             // Gộp: Các mục từ server + các mục đang tải ở local
-             const mergedMedia = [...serverMedia];
-             
-             localPlaceholders.forEach((lp: any) => {
-                if (!mergedMedia.find((sm: any) => sm.storage_path === lp.storage_path)) {
-                   mergedMedia.push(lp);
-                }
-             });
+      // Xoá progress sau 1s thành công
+      setTimeout(() => setUploadingFiles(prev => {
+        const n = { ...prev }; delete n[pPath]; return n;
+      }), 1500);
 
-             return { ...f, media: mergedMedia };
-           });
-        }
-      } catch (err) { console.error("Sync DB Error:", err); }
-    };
-
-    runSequentialUpload();
     } catch (err: any) {
-      console.error("Upload Error:", err);
-      alert("Lỗi tải lên: " + (err.message || "Vui lòng thử lại"));
+      console.error(`[Upload Error] ${file.name}:`, err);
+      setUploadingFiles(prev => ({ ...prev, [pPath]: -1 }));
     }
   };
 
-  const handleRemoveMedia = async (storagePath: string) => {
-    if (!momentId) return;
+  const syncMediaList = async (latestMedia: any[], adminHash: string) => {
+    const finalizedOnly = latestMedia.filter((m: any) => !m.isPlaceholder && m.url);
+    if (finalizedOnly.length === 0 && latestMedia.length > 0) return;
+    try {
+      const syncRes = await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'SAVE_MEDIA_LIST', payload: { media: finalizedOnly } })
+      });
+      const result = await syncRes.json();
+      if (result.success && result.media) {
+        setFormData(f => {
+          const serverMedia = result.media;
+          const localPlaceholders = f.media.filter((m: any) => m.isPlaceholder);
+          const mergedMedia = [...serverMedia];
+          localPlaceholders.forEach((lp: any) => {
+            if (!mergedMedia.find((sm: any) => sm.storage_path === lp.storage_path)) mergedMedia.push(lp);
+          });
+          return { ...f, media: mergedMedia };
+        });
+      }
+    } catch (err) { console.error("Sync DB Error:", err); }
+  };
 
-    // Tìm item cụ thể để lấy ID database nếu có
-    const itemToRemove = formData.media.find((m: any) => m.storage_path === storagePath);
-    const newList = formData.media.filter((m: any) => m.storage_path !== storagePath);
+  const generateAndUploadThumbnail = async (file: File, videoStoragePath: string, adminHash: string) => {
+    try {
+      console.log(`[Thumbnail] Bắt đầu trích xuất cho: ${videoStoragePath}`);
+      const thumbBlob = await generateVideoThumbnail(file);
+      if (!thumbBlob) return;
+      
+      const thumbFileName = `thumb_${Date.now()}.jpg`;
+      const res = await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'GET_UPLOAD_SIGNED_URL', payload: { fileName: thumbFileName } })
+      });
+      
+      if (!res.ok) return;
+      const { signedUrl: tUrl, path: tPath } = await res.json();
+      
+      // QUAN TRỌNG: Không gửi Authorization header kèm signed URL
+      await fetch(tUrl, { 
+        method: 'PUT', 
+        body: thumbBlob, 
+        headers: { 'Content-Type': 'image/jpeg' } 
+      });
+      
+      const finalThumbnailUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/moments/${tPath}`;
+      console.log(`[Thumbnail] Đã tải lên thành công: ${finalThumbnailUrl}`);
+      
+      // Atomic sync thumbnail vào DB
+      await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          momentId,
+          adminPasswordHash: adminHash,
+          action: 'SYNC_SINGLE_MEDIA',
+          payload: { 
+            item: {
+              storage_path: videoStoragePath,
+              thumbnail_url: finalThumbnailUrl
+            }
+          }
+        })
+      });
+
+      setFormData(prev => ({
+        ...prev,
+        media: prev.media.map((m: any) => m.storage_path === videoStoragePath ? { ...m, thumbnail_url: finalThumbnailUrl } : m)
+      }));
+
+    } catch (e) { 
+      console.error("[Thumbnail] Lỗi:", e); 
+    }
+  };
+
+  // HÀM TẢI LÊN TOÀN CỤC (TỐI ƯU SONG SONG & ATOMIC SYNC)
+  const handleGlobalUpload = async (files: FileList) => {
+    if (!momentId) return;
     
-    // Cập nhật UI ngay lập tức
-    updateFormData({ media: newList });
+    // 1. SNAPSHOT FILE LIST NGAY LẬP TỨC
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    if (sessionMediaStartIndex === null) {
+      setSessionMediaStartIndex(formData.media?.length || 0);
+    }
+
+    // 2. Tạo nhanh Placeholders và Lưu vào Ref để Retry
+    const newPlaceholders = fileArray.map((file, i) => {
+      const pPath = `pending-${Date.now()}-${i}`;
+      filesMapRef.current[pPath] = file; // Lưu tệp vào ref
+      return {
+        url: "", 
+        type: file.type.startsWith('video') ? 'video' : 'image',
+        storage_path: pPath, 
+        name: file.name,
+        isPlaceholder: true
+      };
+    });
+
+    setFormData(prev => ({ ...prev, media: [...(prev.media || []), ...newPlaceholders] }));
+    setIsUploading(true);
 
     try {
       const adminHash = await hashPassword(formData.adminPassword || "admin123");
       
-      if (itemToRemove?.id) {
-        // Trường hợp tin nhắn đã tồn tại trong DB -> Gọi xóa vật lý (DB + Storage)
-        await fetch('/api/manage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            momentId,
-            adminPasswordHash: adminHash,
-            action: 'DELETE_MEDIA',
-            payload: { 
-              mediaId: itemToRemove.id,
-              storagePath: itemToRemove.storage_path // Optional, API sẽ tự tìm nếu thiếu
-            }
-          })
-        });
-        console.log(`[MomentWizard] Physically deleted media: ${itemToRemove.id}`);
-      } else {
-        // Trường hợp tệp chưa có ID (vừa upload) -> Đồng bộ lại danh sách
-        // Chú ý: Filter placeholder ở đây cũng quan trọng
-        const finalizedOnly = newList.filter((m: any) => !m.isPlaceholder && m.url);
-        await fetch('/api/manage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            momentId,
-            adminPasswordHash: adminHash,
-            action: 'SAVE_MEDIA_LIST',
-            payload: { media: finalizedOnly }
-          })
-        });
+      const usageRes = await fetch('/api/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'GET_STORAGE_USAGE' })
+      });
+      
+      let usedBytes = 0;
+      if (usageRes.ok) {
+        const usageData = await usageRes.json();
+        usedBytes = usageData.totalUsedBytes || 0;
       }
-    } catch (err) {
-      console.error("Delete Error:", err);
+      
+      const newFilesTotalSize = fileArray.reduce((acc, f) => acc + f.size, 0);
+      if (usedBytes + newFilesTotalSize > MAX_STORAGE_MB * 1024 * 1024) {
+        alert(`❌ DUNG LƯỢNG KHÔNG ĐỦ!\nGiới hạn tối đa là ${MAX_STORAGE_MB}MB. Hãy xóa bớt file cũ trước khi tải thêm.`);
+        setFormData(prev => ({ ...prev, media: prev.media.filter(m => !newPlaceholders.find(p => p.storage_path === m.storage_path)) }));
+        setIsUploading(false);
+        return;
+      }
+
+      // 4. CHẠY SONG SONG VỚI GIỚI HẠN (NÂNG LÊN 3 LUỒNG)
+      const CONCURRENCY = 3;
+      const queue = [...fileArray.map((f, i) => ({ file: f, placeholder: newPlaceholders[i], index: i }))];
+      
+      const runner = async () => {
+        while (queue.length > 0) {
+          const task = queue.shift();
+          if (task) await uploadSingleFile(task.file, task.placeholder.storage_path, task.index, adminHash);
+        }
+      };
+
+      await Promise.all(Array(Math.min(CONCURRENCY, queue.length)).fill(null).map(runner));
+      await fetchStorageUsage();
+
+    } catch (err: any) {
+      console.error("[Upload] Lỗi hệ thống:", err);
+    } finally {
+      setIsUploading(false);
     }
+  };
+
+  // HÀM THỬ LẠI (RETRY)
+  const handleRetryUpload = async (storagePath: string) => {
+    const file = filesMapRef.current[storagePath];
+    if (!file || !momentId) return;
+
+    console.log(`[Retry] Đang tải lại tệp: ${file.name}`);
+    const adminHash = await hashPassword(formData.adminPassword || "admin123");
+    
+    // Tìm index hiện tại của item trong list để sync đúng vị trí
+    const index = formData.media.findIndex((m: any) => m.storage_path === storagePath);
+    
+    setIsUploading(true);
+    await uploadSingleFile(file, storagePath, index >= 0 ? index : 0, adminHash);
+    setIsUploading(false);
+    await fetchStorageUsage();
+  };
+
+
+  const handleRemoveMedia = async (storagePath: string) => {
+    if (!momentId) return;
+    const itemToRemove = formData.media.find((m: any) => m.storage_path === storagePath);
+    const newList = formData.media.filter((m: any) => m.storage_path !== storagePath);
+    updateFormData({ media: newList });
+    try {
+      const adminHash = await hashPassword(formData.adminPassword || "admin123");
+      if (itemToRemove?.id) {
+        await fetch('/api/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'DELETE_MEDIA', payload: { mediaId: itemToRemove.id } }) });
+      } else {
+        await fetch('/api/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'SAVE_MEDIA_LIST', payload: { media: newList.filter((m: any) => !m.isPlaceholder && m.url) } }) });
+      }
+    } catch (err) { console.error("Delete Error:", err); }
   };
 
   const renderStep = () => {
     const props = { formData, updateFormData, momentId };
     switch (step) {
-      case 1:
-        return <SetupStep1 {...props} />;
-      case 2:
-        return (
-          <AdminHome 
-            momentId={momentId} 
-            onAdd={() => setStep(3)} 
-            onEdit={(id) => {
-              const idx = formData.media.findIndex(m => m.id === id);
-              setEditingIndex(idx >= 0 ? idx : 0);
-              setStep(4);
-            }} 
-            onRemove={handleRemoveMedia}
-            settings={{
-              isPrivate: formData.isPrivate,
-              viewerPassword: formData.viewerPassword,
-              viewerHint: formData.viewerHint
-            }}
-            onSaveSettings={handleQuickSettingsSave}
-          />
-        );
-      case 3:
-        return (
-          <SetupStep2 
-            {...props} 
-            onUpload={handleGlobalUpload}
-            uploadingFiles={uploadingFiles}
-            onEditItem={(idx) => {
-              setEditingIndex(idx);
-              setStep(4);
-            }}
-          />
-        );
-      case 4:
-        return (
-          <SetupStep3 
-            {...props} 
-            editingIndex={editingIndex ?? 0}
-            uploadingFiles={uploadingFiles}
-            onBack={() => setStep(3)}
-          />
-        );
-      case 5:
-        return <SetupStep4 {...props} />;
-      case 6:
-        return <SetupStep5 onGoToStep={(n) => setStep(n)} onHome={() => onBack?.()} />;
-      default:
-        return <SetupStep1 {...props} />;
+      case 1: return <SetupStep1 {...props} />;
+      case 2: return <AdminHome momentId={momentId} onAdd={() => { setComeFromStep(2); setStep(3); setSessionMediaStartIndex(null); }} onEdit={(id) => { const idx = formData.media.findIndex(m => m.id === id); setEditingIndex(idx >= 0 ? idx : 0); setComeFromStep(2); setStep(4); }} onRemove={handleRemoveMedia} settings={{ isPrivate: formData.isPrivate, viewerPassword: formData.viewerPassword, viewerHint: formData.viewerHint }} onSaveSettings={handleQuickSettingsSave} />;
+      case 3: return <SetupStep2 {...props} onUpload={handleGlobalUpload} onRetry={handleRetryUpload} uploadingFiles={uploadingFiles} storageInfo={storageInfo} onEditItem={(idx) => { setEditingIndex(idx); setComeFromStep(3); setStep(4); }} />;
+      case 4: return <SetupStep3 {...props} editingIndex={editingIndex ?? 0} uploadingFiles={uploadingFiles} onBack={() => setStep(comeFromStep)} />;
+      case 5: return <SetupStep4 {...props} />;
+      case 6: return <SetupStep5 onGoToStep={(n) => setStep(n)} onHome={() => onBack?.()} />;
+      default: return <SetupStep1 {...props} />;
     }
   };
 
-  const isUploading = Object.keys(uploadingFiles).length > 0;
-
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Top Navigation */}
       <header className="fixed top-0 w-full z-50 bg-zinc-950/20 backdrop-blur-xl bg-gradient-to-b from-zinc-900/50 to-transparent shadow-2xl flex justify-between items-center px-6 py-4 border-b border-white/5">
         <div className="flex items-center gap-4">
-          <button
-            onClick={step <= 2 ? onBack : prevStep}
-            className={`hover:opacity-80 transition-opacity active:scale-95 duration-200 text-primary ${
-              (step === 1) ? "opacity-0 pointer-events-none" : ""
-            }`}
-          >
+          <button onClick={step <= 2 ? onBack : prevStep} className={`hover:opacity-80 transition-opacity active:scale-95 duration-200 text-primary ${step === 1 ? "opacity-0 pointer-events-none" : ""}`}>
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
-          <span className="text-primary font-bold tracking-widest uppercase text-xs">
-            BearQR Portal
-          </span>
+          <span className="text-primary font-bold tracking-widest uppercase text-xs">Omemo Portal</span>
         </div>
         <div className="flex flex-col items-center">
           <StepIndicator currentStep={step} totalSteps={totalSteps} />
-          {step === 4 && (
-            <span className="text-[8px] font-bold text-rose-400 uppercase tracking-widest mt-1 animate-pulse">
-              Đang biên tập nội dung
-            </span>
-          )}
+          {step === 4 && <span className="text-[8px] font-bold text-rose-400 uppercase tracking-widest mt-1 animate-pulse">Đang biên tập nội dung</span>}
         </div>
       </header>
-
-      {/* Main Content */}
       <main className="flex-1 pt-32 pb-40 px-6 max-w-lg mx-auto w-full">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.3 }}
-          >
+          <motion.div key={step} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.3 }}>
             {renderStep()}
           </motion.div>
         </AnimatePresence>
       </main>
-
-      {/* Bottom Actions - Hidden on Step 2 (Home) and Step 6 (Done) */}
       {step !== 2 && step < 6 && (
         <footer className="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-8 pb-10 pt-6 bg-zinc-950/40 backdrop-blur-3xl rounded-t-[2.5rem] border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
-          <button
-            onClick={step === 1 ? onBack : prevStep}
-            className={`flex items-center justify-center text-rose-200/60 bg-white/5 rounded-2xl px-6 py-4 hover:bg-white/10 transition-all active:scale-[0.98] duration-150 ${
-              (step === 1) ? "opacity-0 pointer-events-none" : ""
-            }`}
-          >
+          <button onClick={step === 1 ? onBack : prevStep} className={`flex items-center justify-center text-rose-200/60 bg-white/5 rounded-2xl px-6 py-4 hover:bg-white/10 transition-all active:scale-[0.98] duration-150 ${step === 1 ? "opacity-0 pointer-events-none" : ""}`}>
             <ArrowLeft size={16} className="mr-2" />
-            <span className="font-be-vietnam text-xs font-bold uppercase tracking-widest">
-              {step === 4 ? "Hủy bỏ" : (step === 1 ? "Thoát" : "Quay lại")}
-            </span>
+            <span className="font-be-vietnam text-xs font-bold uppercase tracking-widest">{step === 4 ? "Hủy bỏ" : (step === 1 ? "Thoát" : "Quay lại")}</span>
           </button>
-
           <button
             onClick={nextStep}
-            disabled={isSaving || isUploading}
-            className="flex items-center justify-center bg-gradient-to-r from-rose-300 to-rose-500 text-zinc-950 rounded-2xl px-10 py-4 shadow-xl shadow-rose-500/20 hover:brightness-110 transition-all active:scale-[0.98] duration-150 disabled:opacity-70"
+            disabled={
+              isSaving || 
+              (step === 4 && formData.media[editingIndex ?? 0]?.isPlaceholder) ||
+              (step === 5 && isUploading)
+            }
+            className="flex items-center justify-center bg-gradient-to-r from-rose-300 to-rose-500 text-zinc-950 rounded-2xl px-10 py-4 shadow-xl shadow-rose-500/20 hover:brightness-110 transition-all active:scale-[0.98] duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="font-be-vietnam text-xs font-bold uppercase tracking-widest mr-2">
-              {isSaving ? "Đang xử lý..." : isUploading ? "Đang tải lên..." : (step === 5 ? "Lưu và kích hoạt" : (step === 4 ? "Lưu lời nhắn" : "Tiếp theo"))}
+              {isSaving ? "Đang xử lý..." : 
+               (step === 5 ? "Lưu và kích hoạt" : 
+               (step === 4 ? ((editingIndex ?? 0) < (formData.media?.length || 0) - 1 ? "Tiếp theo (Tệp)" : "Xong biên tập") : 
+               "Tiếp theo"))}
             </span>
-            {isSaving || isUploading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              step === 5 ? <Check size={18} /> : <ArrowRight size={18} />
-            )}
+            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <div className="flex items-center gap-1.5">{(isUploading || Object.keys(uploadingFiles).length > 0) && <Loader2 size={14} className="animate-spin text-zinc-950/50" />} {step === 5 ? <Check size={18} /> : <ArrowRight size={18} />}</div>}
           </button>
         </footer>
       )}
-
-      {/* Background Decorative Elements */}
       <div className="fixed top-1/4 -right-20 w-64 h-64 bg-primary/5 blur-[120px] rounded-full -z-10" />
       <div className="fixed bottom-1/4 -left-20 w-80 h-80 bg-rose-900/10 blur-[140px] rounded-full -z-10" />
     </div>

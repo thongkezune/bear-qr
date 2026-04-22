@@ -61,7 +61,7 @@ export default function AdminLogin({ onLogin, onBack, adminHint, hashedPassword 
           <ArrowLeft className="text-rose-400 w-5 h-5" />
           <span className="font-outfit text-xs uppercase tracking-widest text-zinc-500">Admin Access</span>
         </button>
-        <div className="text-rose-400 font-bold tracking-tighter text-lg font-outfit">BearQR</div>
+        <div className="text-rose-400 font-bold tracking-tighter text-lg font-outfit">Omemo</div>
       </header>
 
       <main className="flex-grow flex items-center justify-center px-4 py-12 relative z-10">

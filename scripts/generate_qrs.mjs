@@ -30,7 +30,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 // Tham số đầu vào default
 let count = 1;
 let urlPrefix = "http://localhost:3000/m/";
-let logoUrl = "https://bearqr.com/logo.png"; // Có thể thay bằng base64 hoặc logo local
+let logoUrl = "/assets/brand/logo.png"; // Placeholder trỏ vào thư mục brand mới
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -99,7 +99,7 @@ function renderArtisticSVG(qrData, shortId) {
     }
   }
 
-  // Thêm Logo BearQR (Thu nhỏ hơn một chút để tăng tính bền vững dữ liệu)
+  // Thêm Logo Omemo (Thu nhỏ hơn một chút để tăng tính bền vững dữ liệu)
   const logoSize = 6 * blockSize;
   const logoCenter = (margin + size / 2) * blockSize - logoSize / 2;
 
@@ -179,10 +179,10 @@ async function bulkGenerate() {
       
       // 3. Render file Vector
       const svg = renderArtisticSVG(qrData, shortId);
-      const filePath = path.join(outputDir, `bearqr_${shortId}.svg`);
+      const filePath = path.join(outputDir, `omemo_${shortId}.svg`);
       
       fs.writeFileSync(filePath, svg);
-      console.log(`✅ [${i+1}/${count}] Đã sinh QR: bearqr_${shortId}.svg`);
+      console.log(`✅ [${i+1}/${count}] Đã sinh QR: omemo_${shortId}.svg`);
       successCount++;
     } catch (err) {
       console.error(`[Lỗi vòng lặp ${i+1}] ${err.name}: ${err.message}`);

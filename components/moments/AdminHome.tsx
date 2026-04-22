@@ -44,6 +44,11 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
     viewerHint: settings?.viewerHint ?? ""
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const fetchMedia = async () => {
@@ -179,7 +184,7 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center gap-1 text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                         <Calendar size={10} />
-                        {new Date(item.created_at).toLocaleDateString('vi-VN')}
+                        {isMounted && new Date(item.created_at).toLocaleDateString('vi-VN')}
                       </div>
                     </div>
                   </div>

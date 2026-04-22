@@ -31,6 +31,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
   const [isPaused, setIsPaused] = useState(false);
   const [replayKey, setReplayKey] = useState(0); 
   const [isDanmakuEnabled, setIsDanmakuEnabled] = useState(true); // Mặc định bật Ký ức trôi
+  const [isDownloading, setIsDownloading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const bgAudioRef = useRef<HTMLAudioElement>(null);
 
@@ -116,6 +117,48 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
     }
   };
 
+  const handleDownload = async () => {
+    if (!currentMedia?.url || isDownloading) return;
+    
+    setIsDownloading(true);
+    try {
+      const response = await fetch(currentMedia.url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const fileExtension = currentMedia.type === 'video' ? 'mp4' : 'jpg';
+      const fileName = `omemo-${momentId}-${currentMediaIndex + 1}.${fileExtension}`;
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+      // Fallback: Mở link trong tab mới nếu hỏng
+      window.open(currentMedia.url, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: `Kỉ niệm Omemo - ${momentData?.title || momentId}`,
+        text: 'Xem khoảnh khắc tuyệt vời này cùng tôi nhé!',
+        url: window.location.href,
+      }).catch(err => console.log('Share failed:', err));
+    } else {
+      // Fallback: Copy link
+      navigator.clipboard.writeText(window.location.href);
+      alert("Đã sao chép liên kết kỉ niệm!");
+    }
+  };
+
   const goToPrevMedia = () => {
     if (currentMediaIndex > 0) {
       setCurrentMediaIndex((prev) => prev - 1);
@@ -190,8 +233,8 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 w-full max-w-md space-y-6">
           <p className="text-sm uppercase tracking-widest font-bold text-rose-400">Bạn muốn tạo kỉ niệm riêng?</p>
           <div className="text-left space-y-4">
-            <h3 className="text-xl font-bold">Đặt mua BearQR ngay</h3>
-            <p className="text-zinc-500 text-sm">Sở hữu ngay mẫu gấu BearQR phiên bản giới hạn để lưu giữ những khoảnh khắc chân tình nhất.</p>
+            <h3 className="text-xl font-bold">Đặt mua Omemo ngay</h3>
+            <p className="text-zinc-500 text-sm">Sở hữu ngay mẫu quà tặng kỉ niệm Omemo phiên bản giới hạn để lưu giữ những khoảnh khắc chân tình nhất.</p>
           </div>
           <button className="w-full py-4 bg-white text-zinc-950 rounded-2xl font-bold flex items-center justify-center gap-2 hover:scale-105 transition-transform">
              <ShoppingCart size={18} /> Đi tới cửa hàng
@@ -265,9 +308,9 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
 
         {viewState === "intro" && (
           <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={transitionConfig} className="flex flex-col items-center gap-6 text-center">
-            <motion.h1 initial={{ letterSpacing: "0.5em", opacity: 0 }} animate={{ letterSpacing: "0.2em", opacity: 1 }} transition={{ duration: 1.5, ease: "easeOut" }} className="text-6xl md:text-8xl font-bold text-white tracking-[0.2em] font-outfit">BearQR</motion.h1>
+            <motion.h1 initial={{ letterSpacing: "0.5em", opacity: 0 }} animate={{ letterSpacing: "0.2em", opacity: 1 }} transition={{ duration: 1.5, ease: "easeOut" }} className="text-6xl md:text-8xl font-bold text-white tracking-[0.2em] font-outfit">Omemo</motion.h1>
             <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.5, duration: 1 }} className="h-px w-48 bg-gradient-to-r from-transparent via-rose-400 to-transparent" />
-            <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1, duration: 1 }} className="text-rose-300 uppercase tracking-[0.4em] text-xs font-medium">Gói trọn chân tình</motion.p>
+            <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1, duration: 1 }} className="text-rose-300 uppercase tracking-[0.4em] text-xs font-medium">Ôm trọn từng ký ức</motion.p>
           </motion.div>
         )}
 
@@ -281,133 +324,135 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
             <motion.div 
               animate={{ height: isWallExpanded ? "40%" : "100%" }} 
               transition={{ duration: 0.5, ease: "circOut" }} 
-              className="relative z-10 w-full flex items-center justify-center p-4 md:p-8"
+              className="relative z-10 w-full flex flex-col items-center justify-center p-4 md:p-8"
             >
-              <div 
-                onClick={() => setIsMediaEnded(!isMediaEnded)}
-                className="relative w-full h-full max-w-5xl aspect-video md:aspect-[16/9] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/5 bg-zinc-900/40 cursor-pointer group"
-              >
-                <div className="absolute inset-0 flex items-center justify-center">
-                  {currentMedia?.url ? (
-                    currentMedia.type === "video" ? (
-                      <video 
-                        ref={videoRef}
-                        key={`${currentMedia.id}-${replayKey}`}
-                        src={currentMedia.url} 
-                        autoPlay 
-                        playsInline
-                        webkit-playsinline="true"
-                        className="w-full h-full object-cover" 
-                        onEnded={handleMediaEnd} 
-                        onPlay={() => setIsPaused(false)}
-                        onPause={() => setIsPaused(true)}
-                      />
+              <div className="relative w-full max-w-5xl">
+                <div 
+                  onClick={() => setIsMediaEnded(!isMediaEnded)}
+                  className="relative w-full aspect-video md:aspect-[16/9] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/5 bg-zinc-900/40 cursor-pointer group"
+                >
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {currentMedia?.url ? (
+                      currentMedia.type === "video" ? (
+                        <video 
+                          ref={videoRef}
+                          key={`${currentMedia.id}-${replayKey}`}
+                          src={currentMedia.url} 
+                          autoPlay 
+                          playsInline
+                          webkit-playsinline="true"
+                          className="w-full h-full object-cover" 
+                          onEnded={handleMediaEnd} 
+                          onPlay={() => setIsPaused(false)}
+                          onPause={() => setIsPaused(true)}
+                        />
+                      ) : (
+                        <img 
+                          key={`${currentMedia.id}-${replayKey}`}
+                          src={currentMedia.url} 
+                          className="w-full h-full object-cover" 
+                          alt={momentData.title} 
+                        />
+                      )
                     ) : (
-                      <img 
-                        key={`${currentMedia.id}-${replayKey}`}
-                        src={currentMedia.url} 
-                        className="w-full h-full object-cover" 
-                        alt={momentData.title} 
-                      />
-                    )
-                  ) : (
-                    <div className="flex flex-col items-center gap-4 text-zinc-500">
-                      <Loader2 className="animate-spin" />
-                      <span className="text-xs uppercase tracking-widest">Đang tải kỉ niệm...</span>
+                      <div className="flex flex-col items-center gap-4 text-zinc-500">
+                        <Loader2 className="animate-spin" />
+                        <span className="text-xs uppercase tracking-widest">Đang tải kỉ niệm...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Video Playback Overlay */}
+                  <AnimatePresence>
+                    {isMediaEnded && (
+                      <motion.div 
+                        key="overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-20 bg-black/70 backdrop-blur-md flex items-center justify-center px-4"
+                      >
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-lg w-full">
+                          {/* 1. Trước đó */}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); goToPrevMedia(); }}
+                            disabled={currentMediaIndex === 0}
+                            className={`flex flex-col items-center gap-3 group transition-transform active:scale-95 ${currentMediaIndex === 0 ? 'opacity-20 pointer-events-none' : ''}`}
+                          >
+                            <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-rose-500/20 group-hover:border-rose-500/40 transition-colors">
+                               <SkipForward size={20} className="text-white fill-white rotate-180" />
+                            </div>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-white">Trước đó</span>
+                          </button>
+
+                          {/* 2. Xem lại */}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); replayMedia(); }}
+                            className="flex flex-col items-center gap-3 group transition-transform active:scale-95"
+                          >
+                            <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-rose-500/20 group-hover:border-rose-500/40 transition-colors">
+                              <Play size={20} className="text-white fill-white ml-0.5 rotate-180" /> 
+                            </div>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-white">Xem lại</span>
+                          </button>
+
+                          {/* 3. Tiếp theo */}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); goToNextMedia(); }}
+                            className="flex flex-col items-center gap-3 group transition-transform active:scale-95"
+                          >
+                            <div className="w-14 h-14 rounded-full bg-rose-500 border border-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/20 group-hover:scale-110 transition-transform">
+                              <SkipForward size={20} className="text-zinc-950 fill-zinc-950" />
+                            </div>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400 group-hover:text-rose-400">Tiếp theo</span>
+                          </button>
+
+                          {/* 4. Hoàn thành */}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setViewState("success"); }}
+                            className="flex flex-col items-center gap-3 group transition-transform active:scale-95"
+                          >
+                            <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-rose-500/20 group-hover:border-rose-500/40 transition-colors">
+                              <CheckCircle size={20} className="text-white" />
+                            </div>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-white">Kết thúc</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+
+                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 pt-20 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none">
+                    <div className="flex justify-between items-end mb-3">
+                      <div className="space-y-1.5 flex-1">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400/80">Nội dung {currentMediaIndex + 1} / {momentData?.playlist?.length || 1}</span>
+                        <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight font-outfit pt-2">
+                          {currentMedia?.title_memory || momentData?.title || "Kỉ niệm vô giá"}
+                        </h2>
+                      </div>
                     </div>
-                  )}
+                    {/* Progress Bar - Chỉ dành cho video */}
+                    {currentMedia?.type === "video" && (
+                      <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                        <motion.div 
+                          key={`${currentMedia?.id}-${replayKey}`}
+                          initial={{ width: 0 }} 
+                          animate={{ width: (isPlaying && !isMediaEnded) ? "100%" : 0 }} 
+                          transition={{ duration: 999999, ease: "linear" }} 
+                          className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" 
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Danmaku Layer - Tin nhắn trôi */}
+                {/* Danmaku Layer - Tin nhắn trôi (Bây giờ nằm ngoài overflow-hidden) */}
                 <DanmakuLayer 
                   messages={currentMedia?.messages || []} 
                   isEnabled={isDanmakuEnabled && !isMediaEnded && isPlaying} 
                   resetKey={replayKey}
                 />
-
-                {/* Video Playback Overlay */}
-                <AnimatePresence>
-                  {isMediaEnded && (
-                    <motion.div 
-                      key="overlay"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-20 bg-black/70 backdrop-blur-md flex items-center justify-center px-4"
-                    >
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-lg w-full">
-                        {/* 1. Trước đó */}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); goToPrevMedia(); }}
-                          disabled={currentMediaIndex === 0}
-                          className={`flex flex-col items-center gap-3 group transition-transform active:scale-95 ${currentMediaIndex === 0 ? 'opacity-20 pointer-events-none' : ''}`}
-                        >
-                          <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-rose-500/20 group-hover:border-rose-500/40 transition-colors">
-                             <SkipForward size={20} className="text-white fill-white rotate-180" />
-                          </div>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-white">Trước đó</span>
-                        </button>
-
-                        {/* 2. Xem lại */}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); replayMedia(); }}
-                          className="flex flex-col items-center gap-3 group transition-transform active:scale-95"
-                        >
-                          <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-rose-500/20 group-hover:border-rose-500/40 transition-colors">
-                            <Play size={20} className="text-white fill-white ml-0.5 rotate-180" /> 
-                          </div>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-white">Xem lại</span>
-                        </button>
-
-                        {/* 3. Tiếp theo */}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); goToNextMedia(); }}
-                          className="flex flex-col items-center gap-3 group transition-transform active:scale-95"
-                        >
-                          <div className="w-14 h-14 rounded-full bg-rose-500 border border-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/20 group-hover:scale-110 transition-transform">
-                            <SkipForward size={20} className="text-zinc-950 fill-zinc-950" />
-                          </div>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400 group-hover:text-rose-400">Tiếp theo</span>
-                        </button>
-
-                        {/* 4. Hoàn thành */}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setViewState("success"); }}
-                          className="flex flex-col items-center gap-3 group transition-transform active:scale-95"
-                        >
-                          <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-rose-500/20 group-hover:border-rose-500/40 transition-colors">
-                            <CheckCircle size={20} className="text-white" />
-                          </div>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-white">Kết thúc</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 pt-20 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none">
-                  <div className="flex justify-between items-end mb-3">
-                    <div className="space-y-1.5 flex-1">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400/80">Nội dung {currentMediaIndex + 1} / {momentData?.playlist?.length || 1}</span>
-                      <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight font-outfit pt-2">
-                        {currentMedia?.title_memory || momentData?.title || "Kỉ niệm vô giá"}
-                      </h2>
-                    </div>
-                  </div>
-                  {/* Progress Bar - Chỉ dành cho video */}
-                  {currentMedia?.type === "video" && (
-                    <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                      <motion.div 
-                        key={`${currentMedia?.id}-${replayKey}`}
-                        initial={{ width: 0 }} 
-                        animate={{ width: (isPlaying && !isMediaEnded) ? "100%" : 0 }} 
-                        transition={{ duration: 999999, ease: "linear" }} 
-                        className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" 
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
             </motion.div>
 
@@ -440,6 +485,23 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
               >
                  <MessageCircle size={20} />
               </motion.button>
+
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="w-12 h-12 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center shadow-xl hover:bg-white/5 disabled:opacity-50"
+              >
+                 {isDownloading ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+              </motion.button>
+
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={handleShare}
+                className="w-12 h-12 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center shadow-xl hover:bg-white/5"
+              >
+                 <Share2 size={20} />
+              </motion.button>
             </div>
 
             <motion.div animate={{ height: isWallExpanded ? "60%" : "100px", backgroundColor: isWallExpanded ? "rgba(9, 9, 11, 0.98)" : "rgba(9, 9, 11, 0.2)" }} className="relative z-20 w-full backdrop-blur-3xl border-t border-white/10 rounded-t-[2.5rem] overflow-hidden">
@@ -469,7 +531,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                 momentId={momentId}
                 playlist={momentData?.playlist || []}
               />
-              <footer className="text-center pt-20 pb-10 opacity-30 font-be-vietnam-pro"><p className="text-[9px] tracking-[0.4em] uppercase font-light text-zinc-500">BearQR Moments . Lưu giữ chân tình</p></footer>
+              <footer className="text-center pt-20 pb-10 opacity-30 font-be-vietnam-pro"><p className="text-[9px] tracking-[0.4em] uppercase font-light text-zinc-500">Omemo Moments . Ôm trọn từng ký ức</p></footer>
             </div>
           </motion.div>
         )}

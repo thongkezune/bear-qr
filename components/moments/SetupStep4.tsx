@@ -113,7 +113,7 @@ export const SetupStep4 = ({ formData, updateFormData }: SetupStep4Props) => {
               </span>
             </div>
             <p className="text-white font-medium text-sm leading-tight italic">
-              "Kỉ niệm này đã được niêm phong bởi BearQR."
+              "Kỉ niệm này đã được niêm phong bởi Omemo."
             </p>
           </div>
         </div>

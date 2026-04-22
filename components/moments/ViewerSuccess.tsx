@@ -16,8 +16,8 @@ export default function ViewerSuccess({ onReplay, onManage, momentId, playlist =
   const handleShare = async () => {
     const shareUrl = window.location.href;
     const shareData = {
-      title: 'BearQR Moments',
-      text: 'Xem kỉ niệm tuyệt đẹp này từ BearQR!',
+      title: 'Omemo Moments',
+      text: 'Xem kỉ niệm tuyệt đẹp này từ Omemo!',
       url: shareUrl,
     };
 
@@ -50,7 +50,7 @@ export default function ViewerSuccess({ onReplay, onManage, momentId, playlist =
       
       const ext = url.split('.').pop()?.split('?')[0] || 'file';
       const safeTitle = (title || 'Moment').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      link.download = `BearQR_${safeTitle}.${ext}`;
+      link.download = `Omemo_${safeTitle}.${ext}`;
       
       document.body.appendChild(link);
       link.click();
@@ -122,7 +122,7 @@ export default function ViewerSuccess({ onReplay, onManage, momentId, playlist =
         </button>
 
         <a 
-          href="https://bearqr.vn/shop"
+          href="https://omemo.id.vn/shop"
           target="_blank"
           className="group relative bg-gradient-to-r from-rose-400 to-rose-600 text-white p-[1px] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-rose-950/20"
         >
@@ -130,7 +130,7 @@ export default function ViewerSuccess({ onReplay, onManage, momentId, playlist =
             <ShoppingBag className="w-8 h-8 text-rose-400 group-hover:text-white" />
             <div>
               <h3 className="font-bold text-lg">Tiếp tục mua sắm</h3>
-              <p className="text-xs text-zinc-500 group-hover:text-rose-200">Khám phá bộ sưu tập BearQR</p>
+              <p className="text-xs text-zinc-500 group-hover:text-rose-200">Khám phá bộ sưu tập Omemo</p>
             </div>
           </div>
         </a>

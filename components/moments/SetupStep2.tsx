@@ -10,10 +10,21 @@ interface SetupStep2Props {
   momentId?: string;
   onEditItem?: (idx: number) => void;
   onUpload?: (files: FileList) => void;
+  onRetry?: (storagePath: string) => void; // Thêm prop này
   uploadingFiles?: {[key: string]: number};
+  storageInfo?: { usedMB: number, totalMB: number } | null;
 }
 
-export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onUpload, uploadingFiles = {} }: SetupStep2Props) => {
+export const SetupStep2 = ({ 
+  formData, 
+  updateFormData, 
+  momentId, 
+  onEditItem, 
+  onUpload, 
+  onRetry, // Nhận prop này
+  uploadingFiles = {},
+  storageInfo = null 
+}: SetupStep2Props) => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +43,6 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
     if (!storagePath) return;
     const updatedList = formData.media.filter((m: any) => m.storage_path !== storagePath);
     updateFormData({ media: updatedList });
-    // Note: Ở đây có thể đồng bộ DB nếu cần, nhưng tạm thời để Wizard xử lý hoặc Gallery xử lý
   };
 
   return (
@@ -46,6 +56,45 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
         </h2>
         <p className="text-zinc-500 text-sm font-light leading-relaxed max-w-md">Ảnh và video của bạn sẽ được đồng bộ ngay lập tức và bảo mật đa lớp.</p>
       </header>
+
+      {/* HIỂN THỊ DUNG LƯỢNG */}
+      {storageInfo && (
+        <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 space-y-3 shadow-2xl">
+           <div className="flex justify-between items-end">
+              <div className="space-y-1">
+                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Dung lượng kỉ niệm</p>
+                 <p className="text-xl font-black text-rose-400 font-outfit">
+                    {storageInfo.usedMB} <span className="text-xs font-normal text-zinc-600">MB</span>
+                    <span className="mx-2 text-zinc-800 text-sm">/</span>
+                    <span className="text-zinc-400">{storageInfo.totalMB}</span> <span className="text-[10px] font-normal text-zinc-600">MB</span>
+                 </p>
+              </div>
+              <div className="text-right">
+                 <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Còn trống</p>
+                 <p className="text-lg font-bold text-white font-outfit">
+                    {(storageInfo.totalMB - storageInfo.usedMB).toFixed(1)} <span className="text-[10px] font-normal text-zinc-600">MB</span>
+                 </p>
+              </div>
+           </div>
+           
+           <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
+              <motion.div 
+                initial={{ width: 0 }} 
+                animate={{ width: `${(storageInfo.usedMB / storageInfo.totalMB) * 100}%` }} 
+                className={`h-full rounded-full ${
+                  (storageInfo.usedMB / storageInfo.totalMB) > 0.9 ? 'bg-rose-500' : 
+                  (storageInfo.usedMB / storageInfo.totalMB) > 0.7 ? 'bg-orange-500' : 'bg-emerald-500'
+                } shadow-[0_0_10px_rgba(244,63,94,0.3)]`}
+              />
+           </div>
+
+           {(storageInfo.usedMB / storageInfo.totalMB) > 0.8 && (
+             <p className="text-[9px] text-orange-400/80 italic animate-pulse">
+                ⚠️ Dung lượng sắp đầy. Hãy cân nhắc nén video để lưu thêm nhiều kỉ niệm nhé!
+             </p>
+           )}
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 p-4 rounded-2xl text-red-400 text-xs">
@@ -64,19 +113,46 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
         <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-rose-700 rounded-[2.5rem] blur opacity-20 group-hover:opacity-40 transition duration-700"></div>
         <div className="relative rounded-[2.5rem] border-2 border-dashed border-rose-500/30 bg-zinc-950/40 backdrop-blur-3xl p-12 flex flex-col items-center justify-center text-center space-y-6 overflow-hidden min-h-[300px]">
            {Object.keys(uploadingFiles).length > 0 ? (
-             <div className="w-full max-w-sm space-y-6 z-10">
-                <div className="w-16 h-16 rounded-full border-4 border-zinc-800 border-t-rose-500 animate-spin mx-auto" />
-                <div className="space-y-4">
-                   <h3 className="text-white font-bold font-outfit">Đang tải tệp...</h3>
-                   <div className="space-y-3">
-                      {Object.entries(uploadingFiles).map(([name, progress]) => (
-                        <div key={name} className="space-y-1.5">
-                           <div className="flex justify-between text-[9px] font-bold text-rose-300/60 uppercase">
-                              <span className="truncate max-w-[150px]">{name}</span>
-                              <span>{progress}%</span>
+             <div className="w-full max-w-sm space-y-8 z-10 px-4">
+                <div className="relative w-20 h-20 mx-auto">
+                   <div className="absolute inset-0 rounded-full border-4 border-rose-500/10" />
+                   <div className="absolute inset-0 rounded-full border-4 border-t-rose-500 animate-spin" />
+                   <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-zinc-500 text-xs font-bold">{Object.keys(uploadingFiles).length}</span>
+                   </div>
+                </div>
+                <div className="space-y-5">
+                   <div className="text-center space-y-1">
+                      <h3 className="text-white font-bold font-outfit text-lg">Đang đóng gói kỉ niệm...</h3>
+                      <p className="text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Vui lòng không đóng trình duyệt</p>
+                   </div>
+                   <div className="space-y-4 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                      {Object.entries(uploadingFiles).map(([id, progress]) => (
+                        <div key={id} className="space-y-2">
+                           <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-widest">
+                              <span className={progress === -1 ? "text-rose-500" : "text-rose-300/60"}>
+                                 {progress === -1 ? "⚠️ Lỗi tải lên" : "Đang xử lý"}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {progress === -1 && (
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); onRetry?.(id); }}
+                                    className="px-2 py-0.5 rounded-md bg-rose-500 text-white hover:bg-rose-600 active:scale-95 transition-all"
+                                  >
+                                    Thử lại
+                                  </button>
+                                )}
+                                <span className={progress === -1 ? "text-rose-500" : "text-rose-400"}>
+                                  {progress === -1 ? "FAIL" : `${progress}%`}
+                                </span>
+                              </div>
                            </div>
-                           <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                              <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className="h-full bg-rose-500" />
+                           <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                              <motion.div 
+                                initial={{ width: 0 }} 
+                                animate={{ width: progress === -1 ? "100%" : `${progress}%` }} 
+                                className={`h-full ${progress === -1 ? "bg-rose-900" : "bg-gradient-to-r from-rose-400 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.3)]"}`} 
+                              />
                            </div>
                         </div>
                       ))}
@@ -101,6 +177,7 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
         </div>
       </div>
 
+
       {/* 2. RECENT UPLOADS GALLERY */}
       {formData.media?.filter((m: any) => !initialPaths.current.includes(m.storage_path)).length > 0 && (
         <div className="space-y-6 pt-6">
@@ -124,14 +201,29 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
                       </div>
                    ) : (
                      item.type === 'video' ? (
-                       <video 
-                        src={item.url} 
-                        poster={item.thumbnail_url}
-                        playsInline
-                        webkit-playsinline="true"
-                        muted
-                        className="w-full h-full object-cover" 
-                       />
+                        <div className="relative w-full h-full group/v">
+                           <video 
+                              src={item.url} 
+                              poster={item.thumbnail_url}
+                              playsInline
+                              webkit-playsinline="true"
+                              muted
+                              className="w-full h-full object-cover" 
+                           />
+                           {!item.thumbnail_url && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 backdrop-blur-sm">
+                                 <div className="flex flex-col items-center gap-2 text-rose-400">
+                                    <VideoIcon size={32} strokeWidth={1.5} />
+                                    <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">Video</span>
+                                 </div>
+                              </div>
+                           )}
+                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white opacity-60 group-hover/v:scale-110 transition-transform">
+                                 <span className="material-symbols-outlined ml-0.5">play_arrow</span>
+                              </div>
+                           </div>
+                        </div>
                      ) : (
                        <img src={item.url} alt="New" className="w-full h-full object-cover" />
                      )
@@ -149,8 +241,10 @@ export const SetupStep2 = ({ formData, updateFormData, momentId, onEditItem, onU
                          <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/40">
                             {item.isPlaceholder ? <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" /> : <Check size={10} />}
                          </div>
-                         <span className="text-[8px] font-bold text-white uppercase tracking-widest">
-                            {item.isPlaceholder ? `Đang tải ${uploadingFiles[item.storage_path] || 0}%` : "Thành công"}
+                         <span className={`text-[8px] font-bold uppercase tracking-widest ${uploadingFiles[item.storage_path] === -1 ? "text-rose-500" : "text-white"}`}>
+                            {item.isPlaceholder 
+                              ? (uploadingFiles[item.storage_path] === -1 ? "Thất bại" : `Đang tải ${uploadingFiles[item.storage_path] || 0}%`) 
+                              : "Thành công"}
                          </span>
                       </div>
                    </div>

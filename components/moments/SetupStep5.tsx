@@ -51,7 +51,7 @@ export const SetupStep5 = ({ onGoToStep, onHome }: SetupStep5Props) => {
 
         {/* Shopping Card */}
         <a
-          href="https://bearqr.vn/shop" 
+          href="https://omemo.id.vn/shop" 
           target="_blank"
           className="relative group overflow-hidden rounded-[2rem] bg-zinc-900/50 border border-white/5 p-6 flex flex-col items-start justify-between min-h-[140px] transition-all hover:bg-zinc-900/80 hover:scale-[1.02] active:scale-95"
         >
@@ -60,7 +60,7 @@ export const SetupStep5 = ({ onGoToStep, onHome }: SetupStep5Props) => {
           </div>
           <div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">Mua sắm</h3>
-            <p className="text-zinc-600 text-[10px]">BearQR Store</p>
+            <p className="text-zinc-600 text-[10px]">Omemo Store</p>
           </div>
         </a>
 
@@ -92,7 +92,7 @@ export const SetupStep5 = ({ onGoToStep, onHome }: SetupStep5Props) => {
       {/* Footer Decoration */}
       <div className="pt-6 text-center opacity-20 pointer-events-none">
         <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-zinc-500">
-          BearQR Premium Moment
+          Omemo Premium Moment
         </p>
       </div>
     </motion.div>

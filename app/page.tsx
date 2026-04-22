@@ -29,7 +29,7 @@ export default function Home() {
               >
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-500 text-sm font-medium mb-6 dark:bg-rose-950/30">
                   <Stars className="w-4 h-4" />
-                  <span>Kỉ niệm 1 năm thành lập BearQR</span>
+                  <span>Kỉ niệm 1 năm thành lập Omemo</span>
                 </div>
                 
                 <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
@@ -38,7 +38,7 @@ export default function Home() {
                 </h1>
                 
                 <p className="text-xl text-zinc-500 max-w-2xl mx-auto mb-10 dark:text-zinc-400">
-                  BearQR không chỉ là quà tặng, đó là nơi lưu giữ những thước phim quý giá nhất. 
+                  Omemo không chỉ là quà tặng, đó là nơi Ôm trọn từng ký ức quý giá nhất. 
                   Quét mã, lưu khoảnh khắc, trao gửi yêu thương.
                 </p>
 
