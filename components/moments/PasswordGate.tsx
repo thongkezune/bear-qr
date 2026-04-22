@@ -94,7 +94,7 @@ export default function PasswordGate({ onUnlock, onAdminLogin, viewerHint, hashe
                 setPassword(e.target.value);
                 if (error) setError(false);
               }}
-              className={`w-full bg-white/5 border-none ring-1 ${error ? 'ring-rose-500' : 'ring-zinc-800'} focus:ring-rose-500/50 rounded-xl py-4 pl-12 pr-12 text-white placeholder:text-zinc-600 font-be-vietnam-pro transition-all duration-300 backdrop-blur-md`}
+              className={`w-full bg-white/5 border-none ring-1 ${error ? 'ring-rose-500' : 'ring-zinc-800'} focus:ring-rose-500/50 rounded-xl py-4 pl-12 pr-12 text-base text-white placeholder:text-zinc-600 font-be-vietnam-pro transition-all duration-300 backdrop-blur-md`}
               placeholder="Nhập mật khẩu truy cập"
               onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
             />

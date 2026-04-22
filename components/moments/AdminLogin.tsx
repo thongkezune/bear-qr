@@ -96,7 +96,7 @@ export default function AdminLogin({ onLogin, onBack, adminHint, hashedPassword 
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`w-full bg-white/5 border ${isError ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-5 py-4 text-white placeholder:text-zinc-700 focus:ring-2 focus:ring-rose-500/20 transition-all outline-none`}
+                    className={`w-full bg-white/5 border ${isError ? 'border-rose-500' : 'border-white/10'} rounded-2xl px-5 py-4 text-base text-white placeholder:text-zinc-700 focus:ring-2 focus:ring-rose-500/20 transition-all outline-none`}
                     placeholder="••••••••"
                     disabled={isSubmitting}
                   />

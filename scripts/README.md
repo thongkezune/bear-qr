@@ -28,7 +28,7 @@ node scripts/generate_qrs.mjs --count 1 --url http://localhost:3000/m/
 Lệnh này ra lệnh cho cỗ máy: "Hãy sinh cho lô hàng **50** thẻ để tôi đem đi in, trỏ thẳng về website tên miền thật của dự án!".
 
 ```bash
-node scripts/generate_qrs.mjs --count 50 --url https://omemo.id.vn/m/
+node scripts/generate_qrs.mjs --count 5 --url https://omemo.id.vn/m/
 ```
 
 _(Lưu ý: Bạn sửa chữ `omemo.id.vn` thành tên miền bạn đã mua)_

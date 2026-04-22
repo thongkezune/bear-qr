@@ -185,7 +185,7 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
                   onFocus={() => {
                     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
                   }}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 font-be-vietnam-pro"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-white focus:ring-1 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 font-be-vietnam-pro"
                   placeholder="Gấu con, Anh xã, ..."
                 />
               </div>
@@ -197,7 +197,7 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
                   onFocus={() => {
                     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
                   }}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-1 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 resize-none font-be-vietnam-pro"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-base text-white focus:ring-1 focus:ring-rose-500/50 outline-none transition-all placeholder:text-zinc-700 resize-none font-be-vietnam-pro"
                   placeholder="Viết điều gì đó thật ngọt ngào..."
                   rows={4}
                 />
