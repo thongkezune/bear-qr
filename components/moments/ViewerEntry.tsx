@@ -18,15 +18,15 @@ export default function ViewerEntry({ onStart, onAdmin }: ViewerEntryProps) {
         transition={{ duration: 1, ease: "easeOut" }}
         className="mb-12 relative"
       >
-        <div className="absolute inset-0 bg-rose-500/20 blur-3xl scale-150 animate-pulse" />
+        <div className="absolute inset-0 bg-rose-500/20 blur-3xl scale-150 animate-pulse pointer-events-none" />
         <div className="relative bg-white/5 backdrop-blur-2xl p-8 rounded-full border border-white/10 shadow-2xl">
           <Sparkles className="w-12 h-12 text-rose-400 fill-rose-400/20" />
         </div>
         
         {/* Floating Decorative Particles (Simulated) */}
-        <div className="absolute -top-4 -right-2 w-2 h-2 bg-rose-400/40 rounded-full blur-[1px]" />
-        <div className="absolute bottom-4 -left-6 w-3 h-3 bg-rose-500/30 rounded-full blur-[2px]" />
-        <div className="absolute -bottom-8 right-8 w-1.5 h-1.5 bg-white/20 rounded-full" />
+        <div className="absolute -top-4 -right-2 w-2 h-2 bg-rose-400/40 rounded-full blur-[1px] pointer-events-none" />
+        <div className="absolute bottom-4 -left-6 w-3 h-3 bg-rose-500/30 rounded-full blur-[2px] pointer-events-none" />
+        <div className="absolute -bottom-8 right-8 w-1.5 h-1.5 bg-white/20 rounded-full pointer-events-none" />
       </motion.div>
 
       {/* Typography Stack */}
@@ -76,16 +76,15 @@ export default function ViewerEntry({ onStart, onAdmin }: ViewerEntryProps) {
         {/* Secondary Hint */}
         <p className="mt-8 text-zinc-500 font-medium text-xs tracking-widest uppercase flex items-center justify-center gap-2">
           <span className="w-4 h-px bg-zinc-800" />
-          Từ người thương gửi khách
           <span className="w-4 h-px bg-zinc-800" />
         </p>
       </motion.div>
 
       {/* Footer Detail */}
-      <footer className="fixed bottom-12 flex flex-col items-center gap-2 opacity-40">
+      <footer className="fixed bottom-12 flex flex-col items-center gap-2 opacity-40 pointer-events-none">
         <div className="w-px h-12 bg-gradient-to-b from-rose-400/60 to-transparent" />
         <span className="text-[10px] font-medium tracking-[0.3em] uppercase text-zinc-500">
-          Mã số lưu trữ #84920
+          Lời nhắn từ quá khứ của chúng ta
         </span>
       </footer>
     </div>

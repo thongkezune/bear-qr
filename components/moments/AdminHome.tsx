@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Plus, Video, Edit2, Trash2, Calendar, Loader2, X, Play, Settings } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { DeleteConfirmModal } from "../shared/DeleteConfirmModal";
 
 interface MemoryItem {
   id: string;
@@ -45,6 +46,10 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; storagePath: string }>({ 
+    isOpen: false, 
+    storagePath: "" 
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -199,12 +204,7 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
                     <button 
                       onClick={(e) => { 
                         e.stopPropagation(); 
-                        if (confirm("Bạn có chắc chắn muốn xóa kỉ niệm này không?")) {
-                          // Cập nhật giao diện cục bộ ngay lập tức
-                          setMemories(prev => prev.filter((m: any) => m.storage_path !== item.storage_path));
-                          // Gọi hàm xóa ở cấp độ quản lý (Wizard) để đồng bộ DB
-                          onRemove?.(item.storage_path); 
-                        }
+                        setDeleteModal({ isOpen: true, storagePath: item.storage_path });
                       }}
                       className="p-2 rounded-xl bg-white/5 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 transition-all"
                     >
@@ -230,17 +230,7 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
         </div>
       )}
 
-      {/* Stats/Footer */}
-      <div className="pt-8 grid grid-cols-2 gap-4 opacity-50">
-        <div className="bg-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-          <span className="text-xl font-bold text-white tracking-tight">0</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">Lượt xem</span>
-        </div>
-        <div className="bg-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
-          <span className="text-xl font-bold text-white tracking-tight">0</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">Lời nhắn</span>
-        </div>
-      </div>
+
 
       {/* Preview Modal */}
       <AnimatePresence>
@@ -340,9 +330,11 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
                           type="text"
                           value={editingSettings.viewerPassword}
                           onChange={(e) => setEditingSettings(prev => ({ ...prev, viewerPassword: e.target.value }))}
-                          placeholder="Mật khẩu xem kỉ niệm..."
                           className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/50"
                         />
+                        <p className="mt-1 text-[8px] text-zinc-600 italic">
+                          * Để trống nếu không muốn thay đổi mật khẩu.
+                        </p>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Gợi ý cho người nhận</label>
@@ -388,6 +380,17 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DeleteConfirmModal 
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, storagePath: "" })}
+        onConfirm={() => {
+          if (deleteModal.storagePath) {
+            setMemories(prev => prev.filter((m: any) => m.storage_path !== deleteModal.storagePath));
+            onRemove?.(deleteModal.storagePath);
+          }
+        }}
+      />
     </motion.div>
   );
 };

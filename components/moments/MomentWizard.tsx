@@ -12,6 +12,8 @@ import { SetupStep5 } from "./SetupStep5";
 import { AdminHome } from "./AdminHome";
 import { supabase } from "@/lib/supabase";
 import { hashPassword } from "@/lib/utils";
+import { VideoOptimizer } from "@/lib/videoProcessor";
+import { StorageLimitModal } from "./StorageLimitModal";
 
 interface MomentWizardProps {
   onBack?: () => void;
@@ -27,12 +29,15 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
   
   // Ref để lưu trữ tệp tin phục vụ việc Retry (vì File object không thể lưu vào State dễ dàng)
   const filesMapRef = useRef<{[key: string]: File}>({});
+  // Ref lưu tệp đã nén thành công để không phải nén lại khi Retry
+  const optimizedBlobsRef = useRef<{[key: string]: File}>({});
+
   const [formData, setFormData] = useState({
     adminPassword: adminPassword,
     adminHint: "",
     title: "Kỉ niệm của tôi",
     isPrivate: true,
-    viewerPassword: "BEAR2024",
+    viewerPassword: "",
     viewerHint: "",
     media: [] as { 
       id?: string; 
@@ -54,7 +59,21 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
   const [uploadingFiles, setUploadingFiles] = useState<{[key: string]: number}>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [storageInfo, setStorageInfo] = useState<{ usedMB: number, totalMB: number } | null>(null);
+
+  // States cho Storage Limit Modal
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [limitModalData, setLimitModalData] = useState({
+    usedBytes: 0,
+    newFilesSize: 0,
+    estimatedSize: 0,
+    hasLargeVideos: false,
+    canFitAfterOptimize: true,
+    isOptional: false,
+    pendingFiles: [] as File[],
+    pendingPlaceholders: [] as any[]
+  });
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
@@ -88,6 +107,19 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       console.error("Lỗi lấy dung lượng:", e);
     }
   };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isUploading) {
+        e.preventDefault();
+        e.returnValue = "Tiến trình tải lên đang diễn ra. Nếu rời đi, dữ liệu sẽ bị mất. Bạn có chắc chắn không?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isUploading]);
 
   useEffect(() => {
     const hydrateData = async () => {
@@ -136,6 +168,23 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     setIsSaving(true);
     try {
       const adminHash = await hashPassword(formData.adminPassword || "admin123");
+      
+      const payload: any = {
+        admin_hint: formData.adminHint,
+        viewer_hint: formData.isPrivate ? formData.viewerHint : null,
+        is_private: formData.isPrivate,
+        title: formData.title || "Kỉ niệm của tôi",
+        mood: 'none'
+      };
+
+      // CHỈ CẬP NHẬT MẬT KHẨU NẾU CÓ NHẬP MỚI
+      if (formData.isPrivate && formData.viewerPassword) {
+        payload.viewer_password_hash = await hashPassword(formData.viewerPassword);
+      } else if (!formData.isPrivate) {
+        // Nếu chuyển sang công khai, xóa mật khẩu
+        payload.viewer_password_hash = null;
+      }
+
       const resMeta = await fetch('/api/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,14 +192,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           momentId,
           adminPasswordHash: adminHash,
           action: 'ACTIVATE_OR_UPDATE',
-          payload: {
-            admin_hint: formData.adminHint,
-            viewer_password_hash: formData.isPrivate ? await hashPassword(formData.viewerPassword || "BEAR2024") : null,
-            viewer_hint: formData.isPrivate ? formData.viewerHint : null,
-            is_private: formData.isPrivate,
-            title: formData.title || "Kỉ niệm của tôi",
-            mood: 'none'
-          }
+          payload
         })
       });
       if (!resMeta.ok) throw new Error('Cập nhật thất bại.');
@@ -179,6 +221,20 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     if (!momentId) return;
     try {
       const adminHash = await hashPassword(formData.adminPassword || "admin123");
+      
+      const payload: any = {
+        admin_hint: formData.adminHint,
+        viewer_hint: newSettings.isPrivate ? newSettings.viewerHint : null,
+        is_private: newSettings.isPrivate,
+        title: formData.title || "Kỉ niệm của tôi"
+      };
+
+      if (newSettings.isPrivate && newSettings.viewerPassword) {
+        payload.viewer_password_hash = await hashPassword(newSettings.viewerPassword);
+      } else if (!newSettings.isPrivate) {
+        payload.viewer_password_hash = null;
+      }
+
       const resMeta = await fetch('/api/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,13 +242,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           momentId,
           adminPasswordHash: adminHash,
           action: 'ACTIVATE_OR_UPDATE',
-          payload: {
-            admin_hint: formData.adminHint,
-            viewer_password_hash: newSettings.isPrivate ? await hashPassword(newSettings.viewerPassword || "BEAR2024") : null,
-            viewer_hint: newSettings.isPrivate ? newSettings.viewerHint : null,
-            is_private: newSettings.isPrivate,
-            title: formData.title || "Kỉ niệm của tôi"
-          }
+          payload
         })
       });
       if (!resMeta.ok) throw new Error('Cập nhật thất bại.');
@@ -501,6 +551,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
 
     setFormData(prev => ({ ...prev, media: [...(prev.media || []), ...newPlaceholders] }));
     setIsUploading(true);
+    setIsCalculating(true);
 
     try {
       const adminHash = await hashPassword(formData.adminPassword || "admin123");
@@ -515,35 +566,136 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       if (usageRes.ok) {
         const usageData = await usageRes.json();
         usedBytes = usageData.totalUsedBytes || 0;
+        // CẬP NHẬT STATE ĐỂ ĐỒNG BỘ VỚI CÁC LUỒNG KHÁC
+        setStorageInfo({ usedMB: usedBytes / (1024 * 1024), totalMB: MAX_STORAGE_MB });
       }
       
       const newFilesTotalSize = fileArray.reduce((acc, f) => acc + f.size, 0);
-      if (usedBytes + newFilesTotalSize > MAX_STORAGE_MB * 1024 * 1024) {
-        alert(`❌ DUNG LƯỢNG KHÔNG ĐỦ!\nGiới hạn tối đa là ${MAX_STORAGE_MB}MB. Hãy xóa bớt file cũ trước khi tải thêm.`);
-        setFormData(prev => ({ ...prev, media: prev.media.filter(m => !newPlaceholders.find(p => p.storage_path === m.storage_path)) }));
-        setIsUploading(false);
+      const hasLargeVideos = await VideoOptimizer.hasLargeVideos(fileArray);
+      const isLimitExceeded = (usedBytes + newFilesTotalSize > MAX_STORAGE_MB * 1024 * 1024);
+
+      if (isLimitExceeded || hasLargeVideos) {
+        // ƯỚC TÍNH DUNG LƯỢNG SAU NÉN (CORE BITRATE ESTIMATION)
+        let totalEstimatedSize = 0;
+        for (const file of fileArray) {
+            if (file.type.startsWith('video/')) {
+                totalEstimatedSize += await VideoOptimizer.estimateOptimizedSize(file);
+            } else {
+                totalEstimatedSize += file.size;
+            }
+        }
+
+        setIsCalculating(false);
+        // QUY TẮC CHỐT CHẶN: DƯ 10MB SAU NÉN (Mức 90MB)
+        const SAFE_THRESHOLD = 90 * 1024 * 1024;
+        const canFitAfterOptimize = (usedBytes + totalEstimatedSize) <= SAFE_THRESHOLD;
+        
+        setLimitModalData({
+          usedBytes,
+          newFilesSize: newFilesTotalSize,
+          estimatedSize: totalEstimatedSize,
+          hasLargeVideos,
+          canFitAfterOptimize,
+          isOptional: !isLimitExceeded && hasLargeVideos,
+          pendingFiles: fileArray,
+          pendingPlaceholders: newPlaceholders
+        });
+        setLimitModalOpen(true);
         return;
       }
 
-      // 4. CHẠY SONG SONG VỚI GIỚI HẠN (NÂNG LÊN 3 LUỒNG)
+      setIsCalculating(false);
+      await startUploadFlow(fileArray, newPlaceholders);
+    } catch (err: any) {
+      console.error("[Upload] Lỗi hệ thống:", err);
+      setIsUploading(false);
+      setIsCalculating(false);
+    }
+  };
+
+  const startUploadFlow = async (files: File[], placeholders: any[], skipOptimize = false) => {
+    try {
+      const adminHash = await hashPassword(formData.adminPassword || "admin123");
       const CONCURRENCY = 3;
-      const queue = [...fileArray.map((f, i) => ({ file: f, placeholder: newPlaceholders[i], index: i }))];
+      const queue = [...files.map((f, i) => ({ file: f, placeholder: placeholders[i], index: i }))];
       
       const runner = async () => {
+        // Biến cục bộ để theo dõi dung lượng tăng dần trong quá trình upload
+        let currentLocalUsedBytes = (storageInfo?.usedMB || 0) * 1024 * 1024;
+
         while (queue.length > 0) {
           const task = queue.shift();
-          if (task) await uploadSingleFile(task.file, task.placeholder.storage_path, task.index, adminHash);
+          if (task) {
+            let fileToUpload = task.file;
+            const pPath = task.placeholder.storage_path;
+
+            // KIỂM TRA CACHE NÉN
+            if (optimizedBlobsRef.current[pPath]) {
+              fileToUpload = optimizedBlobsRef.current[pPath];
+            } else if (!skipOptimize && task.file.type.startsWith('video/')) {
+              // CHỐT CHẶN TRƯỚC KHI NÉN (PRE-COMPRESSION GUARD)
+              const estimated = await VideoOptimizer.estimateOptimizedSize(task.file);
+              const MAX_BYTES = MAX_STORAGE_MB * 1024 * 1024;
+              
+              if (currentLocalUsedBytes + estimated > MAX_BYTES) {
+                  console.warn(`[Storage] Pre-check: ${fileToUpload.name} skipped (Estimated ${(estimated/1024/1024).toFixed(1)}MB exceeds limit)`);
+                  setUploadingFiles(prev => ({ ...prev, [pPath]: -1 }));
+                  setFormData(prev => ({ ...prev, media: prev.media.filter(m => m.storage_path !== pPath) }));
+                  alert(`⚠️ DUNG LƯỢNG KHÔNG ĐỦ!\nVideo ${fileToUpload.name} dự kiến nén xong (${(estimated/1024/1024).toFixed(1)}MB) vẫn vượt quá giới hạn 100MB.\nHệ thống đã tự động bỏ qua để tiết kiệm thời gian cho bạn.`);
+                  continue;
+              }
+
+              setUploadingFiles(prev => ({ ...prev, [pPath]: -2 }));
+              fileToUpload = await VideoOptimizer.optimizeVideo(task.file);
+              // LƯU VÀO CACHE ĐỂ PHỤC VỤ RETRY
+              optimizedBlobsRef.current[pPath] = fileToUpload;
+            }
+
+            // CHỐT CHẶN DUNG LƯỢNG ĐỘNG (KIỂM TRA TRƯỚC KHI ĐẨY LÊN)
+            if (currentLocalUsedBytes + fileToUpload.size > MAX_STORAGE_MB * 1024 * 1024) {
+                console.error(`[Storage] Dynamic Block: ${fileToUpload.name} exceeded limit.`);
+                setUploadingFiles(prev => ({ ...prev, [pPath]: -1 }));
+                // Xóa placeholder để người dùng biết tệp này không được upload
+                setFormData(prev => ({ ...prev, media: prev.media.filter(m => m.storage_path !== pPath) }));
+                alert(`❌ DUNG LƯỢNG VƯỢT MỨC!\nKhông thể upload ${fileToUpload.name} (${(fileToUpload.size / 1024 / 1024).toFixed(1)}MB) vì sẽ vượt quá giới hạn 100MB.`);
+                continue;
+            }
+
+            // Tiến hành upload
+            await uploadSingleFile(fileToUpload, pPath, task.index, adminHash);
+            
+            // Cập nhật dung lượng đã dùng để tệp tiếp theo đối soát chính xác
+            currentLocalUsedBytes += fileToUpload.size;
+          }
         }
       };
 
       await Promise.all(Array(Math.min(CONCURRENCY, queue.length)).fill(null).map(runner));
       await fetchStorageUsage();
-
-    } catch (err: any) {
-      console.error("[Upload] Lỗi hệ thống:", err);
+    } catch (err) {
+      console.error("[Upload Flow] Error:", err);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleConfirmOptimize = () => {
+    setLimitModalOpen(false);
+    startUploadFlow(limitModalData.pendingFiles, limitModalData.pendingPlaceholders, false);
+  };
+
+  const handleConfirmOriginal = () => {
+    setLimitModalOpen(false);
+    startUploadFlow(limitModalData.pendingFiles, limitModalData.pendingPlaceholders, true);
+  };
+
+  const handleCancelUpload = () => {
+    setLimitModalOpen(false);
+    setFormData(prev => ({ 
+      ...prev, 
+      media: prev.media.filter(m => !limitModalData.pendingPlaceholders.find(p => p.storage_path === m.storage_path)) 
+    }));
+    setIsUploading(false);
   };
 
   // HÀM THỬ LẠI (RETRY)
@@ -557,8 +709,17 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     // Tìm index hiện tại của item trong list để sync đúng vị trí
     const index = formData.media.findIndex((m: any) => m.storage_path === storagePath);
     
+    // Ưu tiên tệp đã nén sẵn từ cache
+    let fileToUpload = optimizedBlobsRef.current[storagePath] || file;
+    
+    if (!optimizedBlobsRef.current[storagePath] && file.type.startsWith('video/')) {
+      setUploadingFiles(prev => ({ ...prev, [storagePath]: -2 }));
+      fileToUpload = await VideoOptimizer.optimizeVideo(file);
+      optimizedBlobsRef.current[storagePath] = fileToUpload;
+    }
+    
     setIsUploading(true);
-    await uploadSingleFile(file, storagePath, index >= 0 ? index : 0, adminHash);
+    await uploadSingleFile(fileToUpload, storagePath, index >= 0 ? index : 0, adminHash);
     setIsUploading(false);
     await fetchStorageUsage();
   };
@@ -576,6 +737,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
       } else {
         await fetch('/api/manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ momentId, adminPasswordHash: adminHash, action: 'SAVE_MEDIA_LIST', payload: { media: newList.filter((m: any) => !m.isPlaceholder && m.url) } }) });
       }
+      // CẬP NHẬT DUNG LƯỢNG MỚI NGAY LẬP TỨC
+      await fetchStorageUsage();
     } catch (err) { console.error("Delete Error:", err); }
   };
 
@@ -584,7 +747,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     switch (step) {
       case 1: return <SetupStep1 {...props} />;
       case 2: return <AdminHome momentId={momentId} onAdd={() => { setComeFromStep(2); setStep(3); setSessionMediaStartIndex(null); }} onEdit={(id) => { const idx = formData.media.findIndex(m => m.id === id); setEditingIndex(idx >= 0 ? idx : 0); setComeFromStep(2); setStep(4); }} onRemove={handleRemoveMedia} settings={{ isPrivate: formData.isPrivate, viewerPassword: formData.viewerPassword, viewerHint: formData.viewerHint }} onSaveSettings={handleQuickSettingsSave} />;
-      case 3: return <SetupStep2 {...props} onUpload={handleGlobalUpload} onRetry={handleRetryUpload} uploadingFiles={uploadingFiles} storageInfo={storageInfo} onEditItem={(idx) => { setEditingIndex(idx); setComeFromStep(3); setStep(4); }} />;
+      case 3: return <SetupStep2 {...props} onUpload={handleGlobalUpload} onRetry={handleRetryUpload} onRemove={handleRemoveMedia} uploadingFiles={uploadingFiles} storageInfo={storageInfo} onEditItem={(idx) => { setEditingIndex(idx); setComeFromStep(3); setStep(4); }} />;
       case 4: return <SetupStep3 {...props} editingIndex={editingIndex ?? 0} uploadingFiles={uploadingFiles} onBack={() => setStep(comeFromStep)} />;
       case 5: return <SetupStep4 {...props} />;
       case 6: return <SetupStep5 onGoToStep={(n) => setStep(n)} onHome={() => onBack?.()} />;
@@ -613,6 +776,32 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {isCalculating && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center">
+            <Loader2 className="text-rose-500 animate-spin" size={32} />
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-white font-bold tracking-tight">Đang phân tích tệp...</p>
+            <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Vui lòng không tắt trình duyệt</p>
+          </div>
+        </div>
+      )}
+
+      <StorageLimitModal 
+        isOpen={limitModalOpen}
+        onClose={handleCancelUpload}
+        onConfirmOptimize={handleConfirmOptimize}
+        onConfirmOriginal={handleConfirmOriginal}
+        isOptional={limitModalData.isOptional}
+        usedBytes={limitModalData.usedBytes}
+        totalBytes={MAX_STORAGE_MB * 1024 * 1024}
+        newFilesSize={limitModalData.newFilesSize}
+        estimatedSize={limitModalData.estimatedSize}
+        hasLargeVideos={limitModalData.hasLargeVideos}
+        canFitAfterOptimize={limitModalData.canFitAfterOptimize}
+      />
       {step !== 2 && step < 6 && (
         <footer className="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-8 pb-10 pt-6 bg-zinc-950/40 backdrop-blur-3xl rounded-t-[2.5rem] border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]">
           <button onClick={step === 1 ? onBack : prevStep} className={`flex items-center justify-center text-rose-200/60 bg-white/5 rounded-2xl px-6 py-4 hover:bg-white/10 transition-all active:scale-[0.98] duration-150 ${step === 1 ? "opacity-0 pointer-events-none" : ""}`}>

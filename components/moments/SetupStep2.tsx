@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { X, Plus, Image as ImageIcon, Video as VideoIcon, AlertCircle, Edit2, Check } from "lucide-react";
+import { DeleteConfirmModal } from "../shared/DeleteConfirmModal";
 
 interface SetupStep2Props {
   formData: any;
@@ -10,7 +11,8 @@ interface SetupStep2Props {
   momentId?: string;
   onEditItem?: (idx: number) => void;
   onUpload?: (files: FileList) => void;
-  onRetry?: (storagePath: string) => void; // Thêm prop này
+  onRetry?: (storagePath: string) => void;
+  onRemove?: (storagePath: string) => void; 
   uploadingFiles?: {[key: string]: number};
   storageInfo?: { usedMB: number, totalMB: number } | null;
 }
@@ -21,7 +23,8 @@ export const SetupStep2 = ({
   momentId, 
   onEditItem, 
   onUpload, 
-  onRetry, // Nhận prop này
+  onRetry, 
+  onRemove, // Nhận prop này
   uploadingFiles = {},
   storageInfo = null 
 }: SetupStep2Props) => {
@@ -30,6 +33,11 @@ export const SetupStep2 = ({
 
   // Ghi nhớ danh sách đã có từ trước khi vào Bước 3 này để ẩn chúng đi
   const initialPaths = useRef<string[]>(formData.media?.map((m: any) => m.storage_path) || []);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; storagePath: string }>({ 
+    isOpen: false, 
+    storagePath: "" 
+  });
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -39,11 +47,7 @@ export const SetupStep2 = ({
     }
   };
 
-  const removeMedia = async (storagePath: string) => {
-    if (!storagePath) return;
-    const updatedList = formData.media.filter((m: any) => m.storage_path !== storagePath);
-    updateFormData({ media: updatedList });
-  };
+
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-10">
@@ -64,9 +68,9 @@ export const SetupStep2 = ({
               <div className="space-y-1">
                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Dung lượng kỉ niệm</p>
                  <p className="text-xl font-black text-rose-400 font-outfit">
-                    {storageInfo.usedMB} <span className="text-xs font-normal text-zinc-600">MB</span>
+                    {storageInfo.usedMB.toFixed(1)} <span className="text-xs font-normal text-zinc-600">MB</span>
                     <span className="mx-2 text-zinc-800 text-sm">/</span>
-                    <span className="text-zinc-400">{storageInfo.totalMB}</span> <span className="text-[10px] font-normal text-zinc-600">MB</span>
+                    <span className="text-zinc-400">{storageInfo.totalMB.toFixed(0)}</span> <span className="text-[10px] font-normal text-zinc-600">MB</span>
                  </p>
               </div>
               <div className="text-right">
@@ -130,8 +134,8 @@ export const SetupStep2 = ({
                       {Object.entries(uploadingFiles).map(([id, progress]) => (
                         <div key={id} className="space-y-2">
                            <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-widest">
-                              <span className={progress === -1 ? "text-rose-500" : "text-rose-300/60"}>
-                                 {progress === -1 ? "⚠️ Lỗi tải lên" : "Đang xử lý"}
+                              <span className={progress === -1 ? "text-rose-500" : (progress === -2 ? "text-emerald-400" : "text-rose-300/60")}>
+                                 {progress === -1 ? "⚠️ Lỗi tải lên" : (progress === -2 ? "🚀 Đang tối ưu chất lượng..." : "Đang truyền tải")}
                               </span>
                               <div className="flex items-center gap-2">
                                 {progress === -1 && (
@@ -142,16 +146,20 @@ export const SetupStep2 = ({
                                     Thử lại
                                   </button>
                                 )}
-                                <span className={progress === -1 ? "text-rose-500" : "text-rose-400"}>
-                                  {progress === -1 ? "FAIL" : `${progress}%`}
+                                <span className={progress === -1 ? "text-rose-500" : (progress === -2 ? "text-emerald-400" : "text-rose-400")}>
+                                  {progress === -1 ? "FAIL" : (progress === -2 ? "WAIT" : `${progress}%`)}
                                 </span>
                               </div>
                            </div>
                            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
                               <motion.div 
                                 initial={{ width: 0 }} 
-                                animate={{ width: progress === -1 ? "100%" : `${progress}%` }} 
-                                className={`h-full ${progress === -1 ? "bg-rose-900" : "bg-gradient-to-r from-rose-400 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.3)]"}`} 
+                                animate={{ width: progress === -1 ? "100%" : (progress === -2 ? "100%" : `${progress}%`) }} 
+                                className={`h-full ${
+                                  progress === -1 ? "bg-rose-900" : 
+                                  progress === -2 ? "bg-emerald-500 animate-pulse" : 
+                                  "bg-gradient-to-r from-rose-400 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                                }`} 
                               />
                            </div>
                         </div>
@@ -234,7 +242,7 @@ export const SetupStep2 = ({
                    <div className="absolute inset-0 p-3 flex flex-col justify-between">
                       <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 transition-transform">
                          <button onClick={(e) => { e.stopPropagation(); onEditItem?.(formData.media.indexOf(item)); }} className="p-2.5 rounded-xl bg-zinc-950/60 border border-white/10 text-white hover:bg-rose-500"><Edit2 size={14} /></button>
-                         <button onClick={(e) => { e.stopPropagation(); removeMedia(item.storage_path); }} className="p-2.5 rounded-xl bg-zinc-950/60 border border-white/10 text-white hover:bg-red-500"><X size={14} /></button>
+                         <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ isOpen: true, storagePath: item.storage_path }); }} className="p-2.5 rounded-xl bg-zinc-950/60 border border-white/10 text-white hover:bg-red-500"><X size={14} /></button>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -253,6 +261,16 @@ export const SetupStep2 = ({
            </div>
         </div>
       )}
+
+      <DeleteConfirmModal 
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, storagePath: "" })}
+        onConfirm={() => {
+          if (deleteModal.storagePath) {
+            onRemove?.(deleteModal.storagePath);
+          }
+        }}
+      />
     </motion.div>
   );
 };

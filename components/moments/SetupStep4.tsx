@@ -71,11 +71,13 @@ export const SetupStep4 = ({ formData, updateFormData }: SetupStep4Props) => {
                 <div className="relative">
                   <input
                     className="w-full bg-surface-container-highest/50 border-none rounded-2xl px-5 py-4 text-primary font-mono tracking-[0.3em] focus:ring-2 focus:ring-primary/50 transition-all outline-none"
-                    placeholder="••••••••"
                     type="password"
                     value={formData.viewerPassword}
                     onChange={(e) => updateFormData({ viewerPassword: e.target.value })}
                   />
+                  <p className="mt-2 text-[9px] text-zinc-500 italic px-1">
+                    * Để trống nếu không muốn thay đổi mật khẩu.
+                  </p>
                 </div>
               </div>
 
