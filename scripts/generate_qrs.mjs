@@ -155,7 +155,7 @@ async function bulkGenerate() {
   // Tiền xử lý: Rút toàn bộ ID trong CSDL
   console.log("Đang quét đối chiếu danh bạ DB để tự động chống trùng lặp mã...");
   const { data: existingMoments, error: fetchError } = await supabaseWithRetry(() => 
-    supabase.from('moments').select('short_id')
+    (supabase.from('moments' as any) as any).select('short_id')
   );
 
   if (fetchError) {
@@ -181,7 +181,7 @@ async function bulkGenerate() {
     try {
       // 1. Lưu vào Database (chưa kích hoạt)
       const { error } = await supabaseWithRetry(() => 
-        supabase.from('moments').insert({
+        (supabase.from('moments' as any) as any).insert({
           short_id: shortId,
           is_activated: false,
           title: "Kỉ niệm bí ẩn",

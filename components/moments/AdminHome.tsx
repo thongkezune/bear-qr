@@ -63,8 +63,8 @@ export const AdminHome = ({ momentId, onAdd, onEdit, onRemove, settings, onSaveS
       }
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('moment_media')
+        const { data, error } = await (supabase
+          .from('moment_media' as any) as any)
           .select('*')
           .eq('moment_id', momentId)
           .order('order_index', { ascending: true });

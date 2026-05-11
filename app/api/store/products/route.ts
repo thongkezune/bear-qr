@@ -3,8 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(req: NextRequest) {
   try {
-    const { data: products, error } = await supabaseAdmin
-      .from('store_products')
+    const { data: products, error } = await (supabaseAdmin
+      .from('store_products' as any) as any)
       .select('*')
       .eq('is_active', true)
       .order('created_at', { ascending: false });

@@ -45,8 +45,8 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
     try {
       if (shouldResetState) setViewState("loading");
       
-      const { data: moments, error: fetchError } = await supabase
-        .from("moments")
+      const { data: moments, error: fetchError } = await (supabase
+        .from("moments" as any) as any)
         .select("*, playlist:moment_media(*, messages:media_messages(*))")
         .eq("short_id", momentId.toLowerCase())
         .limit(1);
@@ -59,7 +59,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
         return;
       }
 
-      const sortedPlaylist = (data.playlist || []).sort((a: any, b: any) => a.order_index - b.order_index);
+      const sortedPlaylist = ((data as any).playlist || []).sort((a: any, b: any) => a.order_index - b.order_index);
 
       setMomentData({
         ...data,

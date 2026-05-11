@@ -69,8 +69,8 @@ export default function AdminOrders() {
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
-    const { error } = await supabase
-      .from("store_orders")
+    const { error } = await (supabase
+      .from("store_orders") as any)
       .update({ status: newStatus })
       .eq("id", id);
     

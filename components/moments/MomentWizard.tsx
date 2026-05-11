@@ -125,8 +125,8 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     const hydrateData = async () => {
       if (!momentId) return;
       try {
-        const { data: moment, error: mError } = await supabase
-          .from('moments')
+        const { data: moment, error: mError } = await (supabase
+          .from('moments' as any) as any)
           .select('*, media:moment_media(*, messages:media_messages(*))')
           .ilike('short_id', momentId.trim().toLowerCase())
           .limit(1)

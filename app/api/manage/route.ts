@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Kiểm tra quyền Admin (Verify Password Hash)
-    const { data: moments, error: authError } = await supabaseAdmin
-      .from('moments')
+    const { data: moments, error: authError } = await (supabaseAdmin
+      .from('moments' as any) as any)
       .select('short_id, admin_password_hash, is_activated, is_private')
       .ilike('short_id', cleanId)
       .limit(1);
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
     // 2. Thực hiện hành động Admin (Dùng Service Role nên bypass RLS)
     switch (action) {
       case 'ACTIVATE_OR_UPDATE':
-        const { error: updateError } = await supabaseAdmin
-          .from('moments')
+        const { error: updateError } = await (supabaseAdmin
+          .from('moments' as any) as any)
           .update({
             ...payload,
             admin_password_hash: adminPasswordHash,
@@ -118,8 +118,8 @@ export async function POST(req: NextRequest) {
         
         try {
           // 2. Lấy danh bạ media HIỆN TẠI để đối soát chống xoá nhầm
-          const { data: dbMedia } = await supabaseAdmin
-            .from('moment_media')
+          const { data: dbMedia } = await (supabaseAdmin
+            .from('moment_media' as any) as any)
             .select('*')
             .ilike('moment_id', cleanId);
 
@@ -141,8 +141,8 @@ export async function POST(req: NextRequest) {
             .map((m) => m.id as string);
 
           // 5. Xóa những mục KHÔNG còn nằm trong danh sách (Surgical Delete)
-          const deleteQuery = supabaseAdmin
-            .from('moment_media')
+          const deleteQuery = (supabaseAdmin
+            .from('moment_media' as any) as any)
             .delete()
             .ilike('moment_id', cleanId);
           
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
 
           // Insert file mới
           if (newItems.length > 0) {
-            const { data: insertedItems, error: insErr } = await supabaseAdmin.from('moment_media').insert(newItems).select();
+            const { data: insertedItems, error: insErr } = await (supabaseAdmin.from('moment_media' as any) as any).insert(newItems).select();
             if (insErr) throw insErr;
             
             const typedInsertedItems = (insertedItems || []) as MomentMedia[];
@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
               if (m.admin_author && m.admin_content) {
                 const inserted = typedInsertedItems.find((ins) => ins.storage_path === m.storage_path);
                 if (inserted) {
-                  await supabaseAdmin.from('media_messages').insert([{
+                  await (supabaseAdmin.from('media_messages' as any) as any).insert([{
                     media_id: inserted.id,
                     author: m.admin_author,
                     content: m.admin_content
@@ -219,8 +219,8 @@ export async function POST(req: NextRequest) {
 
           // Update file cũ
           if (existingItems.length > 0) {
-            const { error: upsErr } = await supabaseAdmin
-              .from('moment_media')
+            const { error: upsErr } = await (supabaseAdmin
+              .from('moment_media' as any) as any)
               .upsert(existingItems, { onConflict: 'id' });
             if (upsErr) throw upsErr;
 
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
               if (m.id && m.admin_author && m.admin_content) {
                 // Kiểm tra xem tin nhắn này có giống hệt tin nhắn cuối cùng không để tránh bị lặp khi nhấn lưu nhiều lần
                 const { data: lastMsg } = await supabaseAdmin
-                  .from('media_messages')
+                  .from('media_messages' as any)
                   .select('author, content')
                   .eq('media_id', m.id)
                   .order('created_at', { ascending: false })
@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
                 const typedLastMsg = lastMsg as MediaMessage | null;
 
                 if (!typedLastMsg || typedLastMsg.author !== m.admin_author || typedLastMsg.content !== m.admin_content) {
-                  await supabaseAdmin.from('media_messages').insert([{
+                  await (supabaseAdmin.from('media_messages' as any) as any).insert([{
                     media_id: m.id,
                     author: m.admin_author,
                     content: m.admin_content
@@ -249,8 +249,8 @@ export async function POST(req: NextRequest) {
             }
           }
           // 4. Lấy lại toàn bộ danh sách MỚI NHẤT kèm ID chuẩn từ DB để trả về cho Frontend
-          const { data: finalMedia, error: finalErr } = await supabaseAdmin
-            .from('moment_media')
+          const { data: finalMedia, error: finalErr } = await (supabaseAdmin
+            .from('moment_media' as any) as any)
             .select('*')
             .ilike('moment_id', cleanId)
             .order('order_index', { ascending: true });
@@ -273,8 +273,8 @@ export async function POST(req: NextRequest) {
         console.log(`[API Manage] Atomic Sync for item: ${syncItem.storage_path}`);
         
         // 1. Kiểm tra xem item đã tồn tại trong DB chưa dựa trên storage_path
-        const { data: existingItem } = await supabaseAdmin
-          .from('moment_media')
+        const { data: existingItem } = await (supabaseAdmin
+          .from('moment_media' as any) as any)
           .select('id')
           .eq('storage_path', syncItem.storage_path)
           .maybeSingle();
@@ -289,8 +289,8 @@ export async function POST(req: NextRequest) {
           if (syncItem.order_index !== undefined) updateData.order_index = syncItem.order_index;
           if (syncItem.title_memory) updateData.title_memory = syncItem.title_memory;
 
-          const { data: updated, error: upErr } = await supabaseAdmin
-            .from('moment_media')
+          const { data: updated, error: upErr } = await (supabaseAdmin
+            .from('moment_media' as any) as any)
             .update(updateData)
             .eq('id', existingItem.id)
             .select()
@@ -299,8 +299,8 @@ export async function POST(req: NextRequest) {
           resultItem = updated;
         } else {
           // 3. Nếu chưa có -> Insert
-          const { data: inserted, error: inErr } = await supabaseAdmin
-            .from('moment_media')
+          const { data: inserted, error: inErr } = await (supabaseAdmin
+            .from('moment_media' as any) as any)
             .insert({
               moment_id: moment.short_id,
               url: syncItem.url,
@@ -320,8 +320,8 @@ export async function POST(req: NextRequest) {
 
       case 'GET_STORAGE_USAGE':
         // 1. Lấy danh sách media đã được ghi vào DB
-        const { data: dbMediaUsage } = await supabaseAdmin
-          .from('moment_media')
+        const { data: dbMediaUsage } = await (supabaseAdmin
+          .from('moment_media' as any) as any)
           .select('storage_path')
           .ilike('moment_id', cleanId);
         
@@ -349,8 +349,8 @@ export async function POST(req: NextRequest) {
         console.log(`[API Manage] Starting cleanup for moment: ${cleanId}`);
         
         // 1. Lấy danh sách file trong DB
-        const { data: dbMediaCleanup } = await supabaseAdmin
-          .from('moment_media')
+        const { data: dbMediaCleanup } = await (supabaseAdmin
+          .from('moment_media' as any) as any)
           .select('storage_path, thumbnail_url')
           .ilike('moment_id', cleanId);
         
@@ -404,8 +404,8 @@ export async function POST(req: NextRequest) {
 
       case 'DELETE_MEDIA':
         // 1. Lấy thông tin media trước khi xóa để biết storage_path
-        const { data: mediaToDelete } = await supabaseAdmin
-          .from('moment_media')
+        const { data: mediaToDelete } = await (supabaseAdmin
+          .from('moment_media' as any) as any)
           .select('storage_path, thumbnail_url')
           .eq('id', payload.mediaId)
           .maybeSingle();
@@ -429,8 +429,8 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Xóa dòng trong DB (Cascade sẽ tự xóa media_messages nếu đã config, hoặc ta xóa tay)
-        await supabaseAdmin.from('media_messages').delete().eq('media_id', payload.mediaId as string);
-        await supabaseAdmin.from('moment_media').delete().eq('id', payload.mediaId as string);
+        await (supabaseAdmin.from('media_messages' as any) as any).delete().eq('media_id', payload.mediaId as string);
+        await (supabaseAdmin.from('moment_media' as any) as any).delete().eq('id', payload.mediaId as string);
         
         return NextResponse.json({ success: true });
 

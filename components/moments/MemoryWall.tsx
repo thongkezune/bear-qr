@@ -37,8 +37,8 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
       }
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('media_messages')
+        const { data, error } = await (supabase
+          .from('media_messages' as any) as any)
           .select('*')
           .eq('media_id', mediaId)
           .order('created_at', { ascending: false });
@@ -60,8 +60,8 @@ export default function MemoryWall({ mediaId }: MemoryWallProps) {
 
     setIsSending(true);
     try {
-      const { data, error } = await supabase
-        .from('media_messages')
+      const { data, error } = await (supabase
+        .from('media_messages' as any) as any)
         .insert([
           {
             media_id: mediaId,

@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
     // 2. Thực hiện hành động Admin
     switch (action) {
       case 'FETCH_PRODUCTS':
-        const { data: products, error: fetchError } = await supabaseAdmin
-          .from('store_products')
+        const { data: products, error: fetchError } = await (supabaseAdmin
+          .from('store_products' as any) as any)
           .select('*')
           .order('created_at', { ascending: false });
         
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
         
         if (id) {
           // Update
-          const { data: updated, error: updateError } = await supabaseAdmin
-            .from('store_products')
+          const { data: updated, error: updateError } = await (supabaseAdmin
+            .from('store_products' as any) as any)
             .update(productData)
             .eq('id', id)
             .select()
@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ product: updated });
         } else {
           // Insert
-          const { data: inserted, error: insertError } = await supabaseAdmin
-            .from('store_products')
+          const { data: inserted, error: insertError } = await (supabaseAdmin
+            .from('store_products' as any) as any)
             .insert([productData])
             .select()
             .single();
@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
         const { productId } = payload;
         if (!productId) throw new Error('Thiếu ID sản phẩm.');
         
-        const { error: deleteError } = await supabaseAdmin
-          .from('store_products')
+        const { error: deleteError } = await (supabaseAdmin
+          .from('store_products' as any) as any)
           .delete()
           .eq('id', productId);
         
