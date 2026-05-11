@@ -94,14 +94,14 @@ export default function AdminStore() {
     };
 
     if (editingProduct) {
-      const { error } = await supabase
-        .from("store_products")
+      const { error } = await (supabase
+        .from("store_products") as any)
         .update(productData)
         .eq("id", editingProduct.id);
       if (error) alert(error.message);
     } else {
-      const { error } = await supabase
-        .from("store_products")
+      const { error } = await (supabase
+        .from("store_products") as any)
         .insert([productData]);
       if (error) alert(error.message);
     }

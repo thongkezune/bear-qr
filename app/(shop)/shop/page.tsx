@@ -76,8 +76,8 @@ export default function ShopPage() {
 
     const totalPrice = selectedProduct!.price + STORE_CONFIG.shipping.fee;
 
-    const { data, error } = await supabase
-      .from("store_orders")
+    const { data, error } = await (supabase
+      .from("store_orders") as any)
       .insert([{
         product_id: selectedProduct!.id,
         customer_name: customerName,
