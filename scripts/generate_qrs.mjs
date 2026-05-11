@@ -30,13 +30,29 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 // Tham số đầu vào default
 let count = 1;
 let urlPrefix = "http://localhost:3000/m/";
-let logoUrl = "/assets/brand/logo.png"; // Placeholder trỏ vào thư mục brand mới
+let batch = "f1"; // Tiền tố phân loại đợt tạo (f1, f2, f3...)
+let logoUrl = "/assets/brand/logo.png"; // Quay lại định dạng .png để có nền trong suốt
+let logoDataUri = "";
+
+// Đọc và chuyển đổi logo sang Base64 để nhúng trực tiếp
+try {
+  const logoPath = path.join(__dirname, '../public', logoUrl);
+  if (fs.existsSync(logoPath)) {
+    const logoBuffer = fs.readFileSync(logoPath);
+    const base64Logo = logoBuffer.toString('base64');
+    const mimeType = logoUrl.endsWith('.jpg') || logoUrl.endsWith('.jpeg') ? 'image/jpeg' : 'image/png';
+    logoDataUri = `data:${mimeType};base64,${base64Logo}`;
+  }
+} catch (err) {
+  console.warn("⚠️ Cảnh báo: Không thể nhúng logo vào SVG. Lỗi:", err.message);
+}
 
 // Parse arguments
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--count' && args[i + 1]) count = parseInt(args[++i], 10);
   if (args[i] === '--url' && args[i + 1]) urlPrefix = args[++i];
+  if (args[i] === '--batch' && args[i + 1]) batch = args[++i];
 }
 
 // Hàm sinh logo/QR svg
@@ -108,7 +124,7 @@ function renderArtisticSVG(qrData, shortId) {
   <rect width="100%" height="100%" fill="#ffffff" />
   ${svgPaths.join('\n  ')}
   <circle cx="${docSize/2}" cy="${docSize/2}" r="${logoSize/1.7}" fill="#ffffff" />
-  <image href="${logoUrl}" x="${logoCenter}" y="${logoCenter}" width="${logoSize}" height="${logoSize}" />
+  <image href="${logoDataUri || logoUrl}" x="${logoCenter}" y="${logoCenter}" width="${logoSize}" height="${logoSize}" />
 </svg>
   `.trim();
 }
@@ -153,7 +169,10 @@ async function bulkGenerate() {
   for (let i = 0; i < count; i++) {
     let shortId;
     do {
-      shortId = crypto.randomUUID().replace(/-/g, '').substring(0, 8);
+      // Đảm bảo tổng độ dài (batch + randomPart) luôn là 8 ký tự
+      const randomLength = Math.max(0, 8 - batch.length);
+      const randomPart = crypto.randomUUID().replace(/-/g, '').substring(0, randomLength);
+      shortId = `${batch}${randomPart}`;
     } while (usedIds.has(shortId));
     
     usedIds.add(shortId);

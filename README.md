@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Omemo - Ôm trọn từng ký ức 🧸✨
 
-## Getting Started
+Omemo là nền tảng thương mại điện tử quà tặng kỷ vật số hóa cao cấp. Chúng tôi kết hợp giữa những chú gấu bông thủ công tinh xảo và công nghệ mã hóa ký ức (Video, Hình ảnh, Âm thanh) thông qua mã định danh thông minh.
 
-First, run the development server:
+## 🚀 Tính năng nổi bật
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Modern Luxury Noir UI**: Giao diện tối sang trọng với hiệu ứng Glassmorphism và Framer Motion mượt mà.
+- **3D Product Carousel**: Trải nghiệm xem sản phẩm xoay vòng 3D trực quan và cao cấp.
+- **Interactive Demo**: Giả lập quá trình quét mã QR để "đánh thức" ký ức ngay trên trình duyệt.
+- **Admin Dashboard**: Quản lý sản phẩm, đơn hàng và cấu hình cửa hàng thông qua giao diện quản trị bảo mật.
+- **VietQR Integration**: Tự động tạo mã QR thanh toán ngân hàng chính xác cho từng đơn hàng.
+- **Zalo Connect**: Tích hợp kênh tư vấn trực tiếp qua Zalo cho khách hàng.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠 Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: Next.js 15+ (App Router)
+- **Styling**: Tailwind CSS 4.0
+- **Database & Storage**: Supabase
+- **Animation**: Framer Motion
+- **Icons**: Lucide React
+- **Payment**: VietQR API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Hướng dẫn cài đặt
 
-## Learn More
+1. **Clone dự án**:
+   ```bash
+   git clone https://github.com/your-username/bear-qr-web.git
+   cd bear-qr-web
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Cài đặt phụ thuộc**:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Cấu hình môi trường**:
+   Tạo file `.env.local` và điền các thông số sau:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SERVICE_ROLE_KEY=your_supabase_service_role_key
+   NEXT_PUBLIC_ADMIN_KEY=your_admin_secret_key
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. **Chạy thực tế**:
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+## 🗄 Cấu trúc Database
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Dự án yêu cầu các bảng sau trong Supabase:
+- `store_products`: Lưu danh sách gấu bông.
+- `store_orders`: Lưu thông tin đơn hàng khách đặt.
+- `marketing_journey`: (Tùy chọn) Lưu lịch sử thương hiệu.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📄 Bản quyền
+
+Dự án được phát triển bởi **Saitama** & Team Omemo. Toàn bộ giao diện và ý tưởng thuộc bản quyền của Omemo Brand.

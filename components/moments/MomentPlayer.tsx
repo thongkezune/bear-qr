@@ -211,7 +211,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
 
   if (viewState === "loading") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white gap-4">
+      <div suppressHydrationWarning className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white gap-4">
         <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
         <p className="text-sm font-medium tracking-widest uppercase opacity-50 font-outfit">Đang chuẩn bị kỉ niệm...</p>
       </div>
@@ -246,7 +246,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
 
   if (viewState === "error") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white p-6 text-center">
+      <div suppressHydrationWarning className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white p-6 text-center">
         <div className="w-20 h-20 rounded-full bg-rose-500/10 flex items-center justify-center mb-6">
           <AlertCircle className="w-10 h-10 text-rose-500" />
         </div>
@@ -260,7 +260,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
   const currentMedia = momentData?.playlist?.[currentMediaIndex];
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-zinc-950 text-white font-be-vietnam-pro">
+    <div suppressHydrationWarning className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-zinc-950 text-white font-be-vietnam-pro">
       <AnimatePresence mode="wait">
         {viewState === "entry" && (
           <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full h-full flex items-center justify-center px-6">
@@ -551,6 +551,7 @@ export const MomentPlayer = ({ momentId }: MomentPlayerProps) => {
                 onReplay={() => { setCurrentMediaIndex(0); setViewState("player"); }} 
                 onManage={() => setViewState("admin_login")} 
                 momentId={momentId}
+                title={momentData?.title}
                 playlist={momentData?.playlist || []}
               />
               <footer className="text-center pt-20 pb-10 opacity-30 font-be-vietnam-pro"><p className="text-[9px] tracking-[0.4em] uppercase font-light text-zinc-500">Omemo Moments . Ôm trọn từng ký ức</p></footer>

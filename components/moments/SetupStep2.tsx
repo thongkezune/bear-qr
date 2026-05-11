@@ -59,6 +59,17 @@ export const SetupStep2 = ({
            Thêm nội dung kỉ niệm
         </h2>
         <p className="text-zinc-500 text-sm font-light leading-relaxed max-w-md">Ảnh và video của bạn sẽ được đồng bộ ngay lập tức và bảo mật đa lớp.</p>
+        
+        {formData.media.length === 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 text-rose-400/80 text-[10px] font-bold uppercase tracking-widest mt-4"
+          >
+            <AlertCircle size={14} />
+            Cần tải lên ít nhất 1 nội dung để tiếp tục
+          </motion.div>
+        )}
       </header>
 
       {/* HIỂN THỊ DUNG LƯỢNG */}

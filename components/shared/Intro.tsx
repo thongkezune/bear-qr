@@ -24,8 +24,8 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onComplete, 1000); // Wait for exit animation
-    }, 3000);
+      setTimeout(onComplete, 800); 
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [onComplete]);
@@ -36,7 +36,7 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white dark:bg-zinc-950"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background"
         >
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
@@ -70,7 +70,7 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-4xl font-bold tracking-tighter text-zinc-900 dark:text-white"
+              className="text-4xl font-bold tracking-tighter text-foreground"
             >
               Omemo
             </motion.h1>
@@ -79,7 +79,7 @@ export default function Intro({ onComplete }: { onComplete: () => void }) {
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.6, duration: 0.6 }}
-              className="mt-2 text-zinc-500 dark:text-zinc-400 font-medium"
+              className="mt-2 text-on-surface-variant font-medium"
             >
               Ôm trọn từng ký ức
             </motion.p>

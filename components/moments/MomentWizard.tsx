@@ -283,11 +283,11 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
     }
     if (step === 5) handleFinalSave();
     else if (step === 3) {
-      if (formData.media.length > 0) {
-        setEditingIndex(sessionMediaStartIndex !== null ? sessionMediaStartIndex : 0);
+      if (sessionMediaStartIndex !== null) {
+        setEditingIndex(sessionMediaStartIndex);
         setStep(4);
       } else {
-        setStep(5);
+        alert("Vui lòng tải lên ít nhất một kỉ niệm (hình ảnh hoặc video) để tiếp tục!");
       }
     }
     else if (step === 4) {
@@ -812,6 +812,7 @@ export const MomentWizard = ({ onBack, initialStep = 2, momentId, adminPassword 
             onClick={nextStep}
             disabled={
               isSaving || 
+              (step === 3 && sessionMediaStartIndex === null) ||
               (step === 4 && formData.media[editingIndex ?? 0]?.isPlaceholder) ||
               (step === 5 && isUploading)
             }

@@ -9,49 +9,58 @@
   --radius-2xl: 1.5rem;
   --radius-3xl: 2rem;
 
-  /* Omemo Custom Colors from Stitch */
-  --color-primary: #ffb2b9; /* primary-fixed-dim */
-  --color-on-primary: #67001f;
-  --color-primary-container: #fb7185;
-  --color-on-primary-container: #6f0122;
+  /* Omemo Custom Colors - Modern Noir Palette */
+  --color-primary: #f43f5e;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #9f1239;
+  --color-on-primary-container: #ffffff;
 
-  --color-secondary: #ffb2bb;
-  --color-on-secondary: #571c27;
-  --color-secondary-container: #73323d;
-  --color-on-secondary-container: #f59da8;
+  --color-secondary: #fbbf24;
+  --color-on-secondary: #000000;
+  --color-secondary-container: #d97706;
+  --color-on-secondary-container: #ffffff;
 
-  --color-surface: #131316;
-  --color-on-surface: #e4e1e6;
-  --color-on-surface-variant: #debfc1;
-  --color-surface-container: #1f1f22;
-  --color-surface-container-low: #1b1b1e;
-  --color-surface-container-high: #2a2a2d;
-  --color-surface-container-highest: #353438;
+  --color-tertiary: #10b981;
+  --color-on-tertiary: #ffffff;
 
-  --color-error: #ffb4ab;
-  --color-on-error: #690005;
+  --color-surface: #0a0a0b;
+  --color-on-surface: #e2e2e2;
+  --color-on-surface-variant: #a1a1aa;
+  --color-surface-container: #18181b;
+  --color-surface-container-low: #09090b;
+  --color-surface-container-high: #27272a;
+  --color-surface-container-highest: #3f3f46;
+
+  --color-error: #ef4444;
+  --color-on-error: #ffffff;
+
+  /* Custom Spacing */
+  --spacing-section-gap: 120px;
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 20px;
+  --spacing-margin-desktop: 80px;
 
   --animate-pulse-rose: pulse-rose 3s infinite;
 }
 
 @keyframes pulse-rose {
-  0% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.4); }
-  70% { box-shadow: 0 0 0 15px rgba(251, 113, 133, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(244, 63, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Default Theme: Modern Noir (Deep Obsidian) */
+  --background: #0a0a0b;
+  --foreground: #e2e2e2;
+  --surface: #0a0a0b;
+  --on-surface: #e2e2e2;
+  --on-surface-variant: #a1a1aa;
   --primary: #f43f5e;
+  --primary-container: #9f1239;
+  --secondary: #fbbf24;
+  
   --primary-foreground: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #131316; /* Đồng bộ với Stitch theme */
-    --foreground: #e4e1e6;
-  }
 }
 
 body {
@@ -70,23 +79,36 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-.glass-morphism {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.dark .glass-morphism {
-  background: rgba(255, 255, 255, 0.03);
+.glass-panel {
+  background: rgba(43, 27, 28, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.glow-pulse {
-  animation: pulse-rose 3s infinite;
+.ambient-glow {
+  box-shadow: 0 0 60px rgba(255, 178, 183, 0.15);
+}
+
+.btn-primary-glow {
+  box-shadow: 0 0 30px rgba(255, 178, 183, 0.25);
+  transition: all 0.4s ease;
+}
+
+.btn-primary-glow:hover {
+  box-shadow: 0 0 50px rgba(255, 178, 183, 0.4);
+  transform: translateY(-2px);
+}
+
+.scroll-indicator {
+  width: 1px;
+  height: 60px;
+  background: linear-gradient(to bottom, rgba(255, 224, 131, 0), rgba(255, 224, 131, 1), rgba(255, 224, 131, 0));
+  opacity: 0.6;
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #ffb2b9 0%, #fb7185 100%);
+  background: linear-gradient(135deg, #ffb2b7 0%, #ff516a 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

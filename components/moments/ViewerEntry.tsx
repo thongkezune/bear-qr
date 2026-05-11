@@ -82,7 +82,6 @@ export default function ViewerEntry({ onStart, onAdmin }: ViewerEntryProps) {
 
       {/* Footer Detail */}
       <footer className="fixed bottom-12 flex flex-col items-center gap-2 opacity-40 pointer-events-none">
-        <div className="w-px h-12 bg-gradient-to-b from-rose-400/60 to-transparent" />
         <span className="text-[10px] font-medium tracking-[0.3em] uppercase text-zinc-500">
           Lời nhắn từ quá khứ của chúng ta
         </span>

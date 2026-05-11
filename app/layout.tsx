@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Outfit, Be_Vietnam_Pro } from "next/font/google";
+
 import "./globals.css";
 
 const outfit = Outfit({ 
@@ -38,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="dark">
+    <html lang="vi" className="dark" suppressHydrationWarning>
       <head>
         <link 
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" 
@@ -46,10 +47,12 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${outfit.variable} ${beVietnam.variable} font-sans antialiased bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen flex flex-col relative`}
+        className={`${outfit.variable} ${beVietnam.variable} font-sans antialiased bg-background text-foreground min-h-screen flex flex-col relative transition-colors duration-500`}
+        suppressHydrationWarning
       >
-        <div className="noise-overlay" aria-hidden="true" />
+        <div className="noise-overlay" aria-hidden="true" suppressHydrationWarning />
         {children}
+
       </body>
     </html>
   );

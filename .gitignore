@@ -23,6 +23,9 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
+*.log
+.eslintcache
 
 # debug
 npm-debug.log*
@@ -30,8 +33,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (NEVER commit sensitive keys)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -42,3 +46,10 @@ next-env.d.ts
 
 # QR Output
 /scripts/output_qrs/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.bak
+*.old
